@@ -8,7 +8,7 @@
 [![Status](https://img.shields.io/badge/Status-Active-28A745?style=for-the-badge&logo=checkmarx&logoColor=white)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
 
-> **Revolutionizing LATAM recruitment with AI-powered semantic matching, WhatsApp integration, and conversational candidate discovery.**
+> **Revolutionizing recruitment with AI-powered semantic matching, WhatsApp integration, and conversational candidate discovery.**
 
 <p align="center">
   <img src="https://img.shields.io/badge/🌎-LATAM%20Focused-28A745?style=for-the-badge" alt="LATAM Focused">
