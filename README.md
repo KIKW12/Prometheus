@@ -11,7 +11,7 @@
 > **Revolutionizing recruitment with AI-powered semantic matching, WhatsApp integration, and conversational candidate discovery.**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/🌎-LATAM%20Focused-28A745?style=for-the-badge" alt="LATAM Focused">
+  <!-- <img src="https://img.shields.io/badge/🌎-LATAM%20Focused-28A745?style=for-the-badge" alt="LATAM Focused"> -->
   <img src="https://img.shields.io/badge/💬-WhatsApp%20Native-25D366?style=for-the-badge" alt="WhatsApp Native">
   <img src="https://img.shields.io/badge/🤖-Gemini%20Powered-FF6F00?style=for-the-badge" alt="Gemini Powered">
   <img src="https://img.shields.io/badge/⚡-2min%20to%20Meeting-DC3545?style=for-the-badge" alt="Fast Hiring">
@@ -43,21 +43,21 @@
 
 ## 🌍 Overview
 
-**Prometheus** is an AI-powered recruitment platform specifically designed for the LATAM (Latin American) market. Built with Google's Gemini 2.5 Flash and integrated with WhatsApp, it transforms the hiring process from a multi-day ordeal into a conversation that takes minutes.
+**Prometheus** is an AI-powered recruitment platform. Built with Google's Gemini 2.5 Flash and integrated with WhatsApp, it transforms the hiring process from a multi-day ordeal into a conversation that takes minutes.
 
 ### Why Prometheus?
 
-Traditional recruitment in LATAM is broken:
+Traditional recruitment is broken:
 - ⏰ **3-5 days** to schedule a single interview
 - 📧 **20% email open rate** for job offers
 - 🔍 **Keyword-based matching** misses great candidates
 - 💬 **No mobile-first communication** in a WhatsApp-dominant market
 
-Prometheus solves these problems by bringing recruitment into the communication platforms LATAM professionals actually use.
+Prometheus solves these problems by bringing recruitment into the communication platforms professionals actually use.
 
 ### The Numbers
 
-- **98% WhatsApp penetration** in LATAM
+-- **98% WhatsApp penetration**
 - **2 minutes** from search to scheduled meeting
 - **Semantic AI matching** finds transferable skills
 - **Conversational filtering** through natural language
@@ -66,7 +66,7 @@ Prometheus solves these problems by bringing recruitment into the communication 
 
 ## 🚨 The Problem
 
-### Traditional Recruitment in LATAM
+### Traditional Recruitment
 
 1. **Communication Barriers**
    - Email-first approach in a WhatsApp-dominant culture
@@ -110,7 +110,7 @@ Prometheus: "Found 1 perfect match: Maria Garcia..."
 
 ### 2. **WhatsApp-First Communication**
 - **98% open rate** vs 20% for email
-- Native platform for LATAM professionals
+-- Native platform for professionals
 - Instant job offers with personalized messages
 - Two-way conversation with automated intent detection
 
@@ -136,7 +136,7 @@ Prometheus: "Found 1 perfect match: Maria Garcia..."
 - **Automated job offers** - Send personalized WhatsApp messages via Twilio
 - **Intent recognition** - Gemini analyzes candidate responses (schedule, interested, decline)
 - **Two-way conversations** - Process replies and trigger appropriate actions
-- **High engagement** - 98% message open rate in LATAM
+-- **High engagement** - 98% message open rate
 
 #### **Intelligent Profile Analysis**
 - **CV parsing** - Extract structured data from unstructured text using Gemini Pro
@@ -811,7 +811,7 @@ Prometheus/
 
 **Result:** 10x productivity increase, handle 500 searches/week
 
-### 3. LATAM Companies - Find Local Talent
+### 3. Companies - Find Local Talent
 
 **Challenge:** Discover talent in specific regions (Mexico City, Buenos Aires, São Paulo)
 
@@ -1055,9 +1055,9 @@ NEXT_PUBLIC_FIREBASE_API_KEY=...
 - **Tailwind CSS** - Utility-first CSS framework
 - **Lucide React** - Beautiful icon set
 
-### LATAM Tech Community
+### Tech Community
 
-- Inspired by the needs of LATAM recruiters and developers
+- Inspired by the needs of recruiters and developers
 - Built for the WhatsApp-first communication culture
 - Addressing real pain points in regional hiring
 
@@ -1076,13 +1076,13 @@ NEXT_PUBLIC_FIREBASE_API_KEY=...
 
 - **Semantic Matching in Recruitment** - Understanding transferable skills
 - **Conversational AI for HR** - Multi-turn dialogue systems
-- **LATAM Digital Trends** - WhatsApp penetration and mobile-first culture
+- **Digital Trends** - WhatsApp penetration and mobile-first culture
 - **Progressive Filtering UX** - Iterative refinement interfaces
 
 
 
 <p align="center">
-  <b>Built with ❤️ for the LATAM tech community</b><br>
+  <b>Built with ❤️ for the tech community</b><br>
   🔥 Bringing recruitment into the WhatsApp era 💬
 </p>
 
