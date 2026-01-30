@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProfileForm from "@/components/ProfileForm";
 import ProfilePreview from "@/components/ProfilePreview";
+import CandidateQuestionnaire, {
+  CandidateQuestionnaireData,
+} from "@/components/CandidateQuestionnaire";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getCurrentUser, removeToken, isAuthenticated } from "@/lib/auth";
+
 
 export interface ProfileData {
   personal_info: {
@@ -33,15 +37,26 @@ export interface ProfileData {
     technologies: string;
   }>;
   skills: string;
+  profileQuestionnaire?: CandidateQuestionnaireData;
 }
 
 export default function BeFoundPage() {
   const router = useRouter();
-  const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "questionnaire" | "preview">("profile");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [originalProfileData, setOriginalProfileData] = useState<ProfileData | null>(null);
+  const [questionnaireData, setQuestionnaireData] = useState<CandidateQuestionnaireData>({
+    career_goals_2_3_years: "",
+    preferred_environment: "",
+    work_style: "",
+    workplace_values: [],
+    ideal_manager: "",
+    problem_domain: "",
+    growth_priority: "",
+    availability: "",
+  });
   const [profileData, setProfileData] = useState<ProfileData>({
     personal_info: {
       name: "",
@@ -164,7 +179,7 @@ export default function BeFoundPage() {
               <span className="text-primary text-2xl font-averia font-semibold">Prometheus</span>
             </p>
           </a>
-          <button 
+          <button
             onClick={handleLogout}
             className="relative inline-flex items-center justify-center text-base font-semibold tracking-base shadow ring-offset-background transition-colors focus-visible:outline-none disabled:opacity-50 border border-muted hover:bg-background/80 h-[42px] px-8 py-2 text-foreground"
           >
@@ -176,16 +191,22 @@ export default function BeFoundPage() {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tighter text-foreground font-inter mb-2">
-              {showPreview ? "profile preview" : "edit your profile"}
+              {activeTab === "preview"
+                ? "profile preview"
+                : activeTab === "questionnaire"
+                  ? "culture questionnaire"
+                  : "edit your profile"}
             </h1>
             <p className="text-lg font-medium leading-6 tracking-base text-muted">
-              {showPreview
+              {activeTab === "preview"
                 ? "This is how recruiters will see your profile"
-                : "Update your information to stay discoverable"}
+                : activeTab === "questionnaire"
+                  ? "Help us match you with the right companies"
+                  : "Update your information to stay discoverable"}
             </p>
           </div>
           <div className="flex gap-3">
-            {!showPreview && (
+            {activeTab === "profile" && (
               <button
                 onClick={saveProfile}
                 disabled={isSaving || !hasUnsavedChanges()}
@@ -220,18 +241,52 @@ export default function BeFoundPage() {
                 )}
               </button>
             )}
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className="bg-transparent text-foreground relative inline-flex items-center border-2 border-primary justify-center text-primary text-base font-semibold tracking-base ring-offset-background transition-colors focus-visible:outline-none disabled:opacity-50 shadow-md hover:brightness-95 px-6 py-2"
-            >
-              {showPreview ? "edit profile" : "preview"}
-            </button>
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-4 border-b border-muted mb-8">
+          <button
+            onClick={() => setActiveTab("profile")}
+            className={`pb-3 px-1 font-medium transition-colors ${activeTab === "profile"
+                ? "text-primary border-b-2 border-primary"
+                : "text-muted hover:text-foreground"
+              }`}
+          >
+            Profile
+          </button>
+          <button
+            onClick={() => setActiveTab("questionnaire")}
+            className={`pb-3 px-1 font-medium transition-colors ${activeTab === "questionnaire"
+                ? "text-primary border-b-2 border-primary"
+                : "text-muted hover:text-foreground"
+              }`}
+          >
+            Culture Questionnaire
+          </button>
+          <button
+            onClick={() => setActiveTab("preview")}
+            className={`pb-3 px-1 font-medium transition-colors ${activeTab === "preview"
+                ? "text-primary border-b-2 border-primary"
+                : "text-muted hover:text-foreground"
+              }`}
+          >
+            Preview
+          </button>
+        </div>
+
         {/* Content */}
-        {showPreview ? (
+        {activeTab === "preview" ? (
           <ProfilePreview profileData={profileData} email={email} phone={phone} />
+        ) : activeTab === "questionnaire" ? (
+          <CandidateQuestionnaire
+            data={questionnaireData}
+            onChange={(data) => setQuestionnaireData(data)}
+            onComplete={() => {
+              setProfileData((prev) => ({ ...prev, profileQuestionnaire: questionnaireData }));
+              setActiveTab("preview");
+            }}
+          />
         ) : (
           <ProfileForm
             profileData={profileData}
@@ -243,4 +298,5 @@ export default function BeFoundPage() {
       </div>
     </main>
   );
+
 }

@@ -1,11 +1,21 @@
 """
 Progressive Candidate Filtration System
 Allows for multi-turn conversations that progressively narrow down candidates
+Now includes tenure analysis and semantic matching.
 """
 
 from typing import List, Dict, Any, Optional
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
 import json
 import os
+
+# Try to import semantic engine
+try:
+    from .semantic_engine import get_semantic_engine
+    SEMANTIC_AVAILABLE = True
+except ImportError:
+    SEMANTIC_AVAILABLE = False
 
 
 class ProgressiveFilter:
@@ -23,7 +33,184 @@ class ProgressiveFilter:
         """Set or update the candidate pool"""
         self.all_candidates = candidates
     
-
+    # ========== TENURE ANALYSIS ==========
+    
+    def calculate_tenure_score(self, job_experience: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyze job tenure patterns to identify stable vs. job-hopping candidates.
+        
+        Scoring:
+        - Base score: 70
+        - Jobs < 12 months: -15 points each
+        - Jobs > 3 years: +10 points each
+        - Recent jobs (last 3 years) weighted 2x
+        
+        Returns:
+            - tenure_score: 0-100 (higher = more stable)
+            - avg_tenure_months: average months per job
+            - short_stint_count: jobs < 12 months
+            - red_flags: list of concerning patterns
+            - stability_level: "stable" | "moderate" | "high_risk"
+        """
+        if not job_experience:
+            return {
+                'tenure_score': 70,  # Neutral if no data
+                'avg_tenure_months': 0,
+                'short_stint_count': 0,
+                'red_flags': [],
+                'stability_level': 'moderate'
+            }
+        
+        today = date.today()
+        durations = []
+        short_stints = 0
+        long_stints = 0
+        recent_short_stints = 0
+        red_flags = []
+        
+        for job in job_experience:
+            duration = self._calculate_job_duration(job, today)
+            if duration is None:
+                continue
+            
+            durations.append(duration)
+            
+            # Is this a recent job (last 3 years)?
+            end_date = self._parse_date(job.get('end_date', 'Present'), today)
+            is_recent = (today - end_date).days < (3 * 365)
+            
+            # Count short stints
+            if duration < 12:
+                short_stints += 1
+                if is_recent:
+                    recent_short_stints += 1
+            elif duration > 36:  # 3+ years
+                long_stints += 1
+        
+        if not durations:
+            return {
+                'tenure_score': 70,
+                'avg_tenure_months': 0,
+                'short_stint_count': 0,
+                'red_flags': [],
+                'stability_level': 'moderate'
+            }
+        
+        # Calculate average tenure
+        avg_tenure = sum(durations) / len(durations)
+        
+        # Calculate score
+        score = 70  # Base score
+        
+        # Penalize short stints
+        score -= short_stints * 15
+        score -= recent_short_stints * 10  # Extra penalty for recent short stints
+        
+        # Bonus for long stints
+        score += long_stints * 10
+        
+        # Clamp to 0-100
+        score = max(0, min(100, score))
+        
+        # Detect red flags
+        if short_stints >= 3:
+            red_flags.append(f"{short_stints} jobs lasted less than 1 year")
+        
+        if recent_short_stints >= 2:
+            red_flags.append("Multiple short stints in the last 3 years")
+        
+        if avg_tenure < 12:
+            red_flags.append(f"Average tenure is only {avg_tenure:.0f} months")
+        
+        # Check for consecutive short stints
+        consecutive_short = 0
+        max_consecutive = 0
+        for d in durations:
+            if d < 12:
+                consecutive_short += 1
+                max_consecutive = max(max_consecutive, consecutive_short)
+            else:
+                consecutive_short = 0
+        
+        if max_consecutive >= 3:
+            red_flags.append(f"{max_consecutive} consecutive jobs under 1 year")
+        
+        # Determine stability level
+        if score >= 75:
+            stability_level = 'stable'
+        elif score >= 50:
+            stability_level = 'moderate'
+        else:
+            stability_level = 'high_risk'
+        
+        return {
+            'tenure_score': round(score, 1),
+            'avg_tenure_months': round(avg_tenure, 1),
+            'short_stint_count': short_stints,
+            'long_stint_count': long_stints,
+            'red_flags': red_flags,
+            'stability_level': stability_level
+        }
+    
+    def _calculate_job_duration(self, job: Dict[str, Any], today: date) -> Optional[int]:
+        """Calculate job duration in months."""
+        start_str = job.get('start_date') or job.get('startDate')
+        end_str = job.get('end_date') or job.get('endDate') or 'Present'
+        
+        if not start_str:
+            return None
+        
+        try:
+            start_date = self._parse_date(start_str, today)
+            end_date = self._parse_date(end_str, today)
+            
+            # Calculate months
+            delta = relativedelta(end_date, start_date)
+            months = delta.years * 12 + delta.months
+            return max(1, months)  # At least 1 month
+        except:
+            return None
+    
+    def _parse_date(self, date_str: str, today: date) -> date:
+        """Parse various date formats."""
+        if not date_str or date_str.lower() in ['present', 'current', 'now']:
+            return today
+        
+        # Try various formats
+        formats = ['%Y-%m-%d', '%Y-%m', '%m/%Y', '%Y', '%B %Y', '%b %Y']
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        
+        # If all else fails, assume it's a year
+        try:
+            year = int(date_str[:4])
+            return date(year, 6, 1)  # Mid-year as default
+        except:
+            return today
+    
+    def _apply_tenure_filter(
+        self, 
+        candidates: List[Dict[str, Any]], 
+        min_avg_tenure_months: int = 18,
+        max_short_stints: int = 2
+    ) -> List[Dict[str, Any]]:
+        """Filter candidates by tenure requirements."""
+        filtered = []
+        
+        for candidate in candidates:
+            tenure = candidate.get('tenure_analysis', {})
+            
+            avg_tenure = tenure.get('avg_tenure_months', 24)
+            short_stints = tenure.get('short_stint_count', 0)
+            
+            if avg_tenure >= min_avg_tenure_months and short_stints <= max_short_stints:
+                filtered.append(candidate)
+        
+        return filtered
     
     def _calculate_skill_match(self, candidate_skills: List[str], required_skills: List[str]) -> Dict[str, Any]:
         """Calculate detailed skill match with scoring"""

@@ -1,9 +1,20 @@
-# Google Agent Development Kit
-google-adk>=0.1.0
+# Prometheus Conversation Agent
+
+# LangGraph Agent (replaces Google ADK)
+langgraph>=0.2.0
+langchain>=0.2.0
+langchain-google-genai>=2.0.0
+langchain-core>=0.2.0
+
+# Semantic Matching  
+sentence-transformers>=2.2.0
 
 # Firebase Admin SDK for Python
 firebase-admin>=6.0.0
 
+# Date utilities
+python-dateutil>=2.8.2
+
 # Additional dependencies
 requests>=2.31.0
-python-dateutil>=2.8.2
+numpy>=1.24.0
