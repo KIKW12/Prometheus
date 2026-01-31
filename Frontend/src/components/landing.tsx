@@ -15,9 +15,11 @@ export default function Landing() {
               <span className="text-primary font-bold">Prometheus</span>
             </p>
           </a>
-          <button className="relative inline-flex items-center justify-center text-sm uppercase tracking-widest font-bold transition-all focus-visible:outline-none disabled:opacity-50 border border-white/10 hover:border-primary/50 hover:bg-primary/10 hover:text-primary h-10 px-8 text-muted/80 hover:shadow-[0_0_20px_rgba(255,77,0,0.15)] rounded-sm font-fjalla glass">
-            log in
-          </button>
+          <a href="/find/sign-in">
+            <button className="relative inline-flex items-center justify-center text-sm uppercase tracking-widest font-bold transition-all focus-visible:outline-none disabled:opacity-50 border border-white/10 hover:border-primary/50 hover:bg-primary/10 hover:text-primary h-10 px-8 text-muted/80 hover:shadow-[0_0_20px_rgba(255,77,0,0.15)] rounded-sm font-fjalla glass">
+              log in
+            </button>
+          </a>
         </div>
 
         {/* Hero Section */}

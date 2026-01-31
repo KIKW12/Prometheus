@@ -46,136 +46,150 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <main className="flex w-full flex-1 flex-col min-h-screen bg-background">
-        <div className="flex-1 flex flex-col px-4 py-8">
-          <div className="flex justify-center items-center px-4 mb-12">
-            <a href="/" className="flex items-center gap-4">
-              <img src="/prometheus.svg" alt="Logo" width="64" height="64" />
-              <p className="text-2xl font-medium leading-6 tracking-base text-foreground font-cormorant">
-                <span className="text-primary text-2xl font-averia font-semibold">Prometheus</span>
-              </p>
-            </a>
+      <main className="flex w-full flex-1 flex-col min-h-screen relative overflow-hidden bg-background items-center justify-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        </div>
+        <div className="glass-card p-12 max-w-md w-full text-center relative z-10 animate-fade-in-up">
+          <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-6 ring-1 ring-primary/50">
+            <svg className="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-foreground mb-4">Check your email</h1>
-              <p className="text-muted mb-6">
-                We've sent a confirmation link to <strong>{email}</strong>
-              </p>
-              <p className="text-sm text-muted">
-                Redirecting to next step...
-              </p>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-4 font-fjalla uppercase">Check your email</h1>
+          <p className="text-muted/80 mb-6 font-inter">
+            We've sent a confirmation link to <strong className="text-primary">{email}</strong>
+          </p>
+          <p className="text-sm text-muted/50 font-inter uppercase tracking-widest">
+            Redirecting...
+          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="flex w-full flex-1 flex-col min-h-screen bg-background">
-      <div className="flex-1 flex flex-col px-4 py-8">
-        {/* Logo */}
-        <div className="flex justify-center items-center px-4 mb-12">
-          <a href="/" className="flex items-center gap-4">
-            <img src="/prometheus.svg" alt="Logo" width="64" height="64" />
-            <p className="text-2xl font-medium leading-6 tracking-base text-foreground font-cormorant">
-              <span className="text-primary text-2xl font-averia font-semibold">Prometheus</span>
+    <main className="flex w-full flex-1 flex-col min-h-screen relative overflow-hidden selection:bg-primary/20">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse delay-1000" />
+      </div>
+
+      <div className="flex-1 flex flex-col px-6 relative z-10">
+        {/* Header */}
+        <div className="flex justify-between items-center py-8 animate-fade-in-down">
+          <a href="/" className="flex items-center gap-3 group">
+            <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110">
+              <img src="/prometheus.svg" alt="Logo" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,77,0,0.5)]" />
+            </div>
+            <p className="text-2xl font-medium tracking-wide text-foreground font-fjalla uppercase">
+              <span className="text-primary font-bold">Prometheus</span>
             </p>
+          </a>
+          <a href="/find/sign-in">
+            <button className="relative inline-flex items-center justify-center text-sm uppercase tracking-widest font-bold transition-all focus-visible:outline-none disabled:opacity-50 border border-white/10 hover:border-primary/50 hover:bg-primary/10 hover:text-primary h-10 px-8 text-muted/80 hover:shadow-[0_0_20px_rgba(255,77,0,0.15)] rounded-sm font-fjalla glass">
+              log in
+            </button>
           </a>
         </div>
 
-        {/* Sign Up Form */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-extrabold tracking-tighter text-foreground font-inter mb-2">
-                create account
+        {/* Main Content */}
+        <div className="flex-1 flex items-center justify-center py-12">
+          <div className="w-full max-w-lg animate-fade-in-up delay-200">
+            {/* Title */}
+            <div className="text-center mb-10">
+              <h1 className="text-6xl md:text-7xl font-black tracking-tighter text-foreground font-fjalla leading-[0.85] uppercase drop-shadow-2xl mb-4">
+                find talent.
               </h1>
-              <p className="text-muted">
-                Join Prometheus to find top talent
+              <p className="text-lg font-light tracking-wide text-muted/80 font-inter">
+                Join our network. Discover the perfect match.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded">
-                  {error}
-                </div>
-              )}
+            {/* Glass Card Form */}
+            <div className="glass-card p-8 md:p-10 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-background border border-muted px-4 py-3 text-foreground outline-none focus:border-primary transition-colors rounded"
-                  placeholder="you@company.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-background border border-muted px-4 py-3 text-foreground outline-none focus:border-primary transition-colors rounded"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full bg-background border border-muted px-4 py-3 text-foreground outline-none focus:border-primary transition-colors rounded"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-primary text-foreground px-8 py-4 font-semibold text-lg hover:brightness-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded"
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Creating account...
-                  </span>
-                ) : (
-                  "Sign Up"
+              <form onSubmit={handleSubmit} className="flex flex-col gap-6 relative z-10">
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded text-sm font-inter">
+                    {error}
+                  </div>
                 )}
-              </button>
-            </form>
 
-            <p className="text-center text-muted mt-6">
-              Already have an account?{" "}
-              <Link href="/find/sign-in" className="text-primary hover:underline">
-                Sign in
-              </Link>
-            </p>
+                {/* Email */}
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Work Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
+                    placeholder="you@company.com"
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Password (6+ chars)
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                {/* Confirm Password */}
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="mt-4 w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 uppercase tracking-widest transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,77,0,0.4)] hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed font-fjalla clip-diagonal"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Creating Account...
+                    </span>
+                  ) : (
+                    "Sign Up"
+                  )}
+                </button>
+
+                <p className="text-xs text-muted/40 text-center font-inter mt-2">
+                  Already have an account?{" "}
+                  <Link href="/find/sign-in" className="text-primary hover:underline transition-colors">
+                    Sign in
+                  </Link>
+                </p>
+              </form>
+            </div>
           </div>
         </div>
       </div>

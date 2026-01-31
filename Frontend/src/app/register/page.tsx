@@ -10,19 +10,12 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
-  const [cvFile, setCvFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setCvFile(e.target.files[0]);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsUploading(true);
+    setIsLoading(true);
     setError("");
 
     try {
@@ -33,13 +26,9 @@ export default function RegisterPage() {
         throw new Error(`Authentication failed: ${authError.message}`);
       }
 
-      // Get the user to ensure we have the ID (might be null if email confirmation is required)
-      // For a smoother dev experience, we might want to handle the session check
+      // Get the user to ensure we have the ID
       const { data: { session } } = await supabase.auth.getSession();
 
-      // If email confirmation is enabled, we might not have a session yet. 
-      // In this case, we can't save the profile yet effectively without the user_id.
-      // However, if we assume auto-confirm or we want to prompt for email check:
       if (!session) {
         alert("Please check your email to confirm your account.");
         return;
@@ -47,80 +36,18 @@ export default function RegisterPage() {
 
       const userId = session.user.id;
 
-      let parsedData = null;
+      // 2. Create empty profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: userId,
+          email: email,
+          phone: phone,
+          profile_data: {},
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
 
-      // 2. If CV is uploaded, parse it
-      if (cvFile) {
-        const formData = new FormData();
-        formData.append("cv", cvFile);
-
-        const response = await fetch("/api/parse-cv", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (response.ok) {
-          parsedData = await response.json();
-        } else {
-          console.error("Failed to parse CV");
-        }
-      }
-
-      // 3. Save initial profile data to Supabase
-      if (parsedData) {
-        // Sanitize the parsed data
-        const sanitizedData = {
-          personal_info: {
-            name: parsedData.personal_info?.name || "",
-            location: parsedData.personal_info?.location || "",
-            image: parsedData.personal_info?.image || "",
-          },
-          education: (parsedData.education || []).map((edu: any) => ({
-            degree: edu?.degree || "",
-            school: edu?.school || "",
-            start_date: edu?.start_date || "",
-            end_date: edu?.end_date || "",
-          })),
-          job_experience: (parsedData.job_experience || []).map((exp: any) => ({
-            role: exp?.role || "",
-            company: exp?.company || "",
-            description: exp?.description || "",
-            start_date: exp?.start_date || "",
-            end_date: exp?.end_date || "",
-          })),
-          projects: (parsedData.projects || []).map((proj: any) => ({
-            name: proj?.name || "",
-            description: proj?.description || "",
-            technologies: proj?.technologies || "",
-          })),
-          skills: parsedData.skills || "",
-        };
-
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .upsert({
-            user_id: userId,
-            email: email,
-            phone: phone,
-            profile_data: sanitizedData,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' });
-
-        if (profileError) throw profileError;
-      } else {
-        // Create empty profile if no CV
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .upsert({
-            user_id: userId,
-            email: email,
-            phone: phone,
-            profile_data: {},
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' });
-
-        if (profileError) throw profileError;
-      }
+      if (profileError) throw profileError;
 
       // Navigate to be-found page after successful registration
       router.push("/be-found");
@@ -128,70 +55,79 @@ export default function RegisterPage() {
       console.error("Registration error:", error);
       setError(error.message || "Failed to process registration.");
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <main className="flex w-full flex-1 flex-col min-h-screen bg-background">
-      <div className="flex-1 flex flex-col px-4 py-8">
-        {/* Logo and Login Button */}
-        <div className="flex justify-between items-center px-4 mb-12">
-          <a href="/" className="flex items-center gap-4">
-            <img src="/prometheus.svg" alt="Logo" width="64" height="64" />
-            <p className="text-2xl font-medium leading-6 tracking-base text-foreground font-cormorant">
-              <span className="text-primary text-2xl font-averia font-semibold">Prometheus</span>
+    <main className="flex w-full flex-1 flex-col min-h-screen relative overflow-hidden selection:bg-primary/20">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] animate-pulse delay-1000" />
+      </div>
+
+      <div className="flex-1 flex flex-col px-6 relative z-10">
+        {/* Header */}
+        <div className="flex justify-between items-center py-8 animate-fade-in-down">
+          <a href="/" className="flex items-center gap-3 group">
+            <div className="relative w-10 h-10 transition-transform duration-300 group-hover:scale-110">
+              <img src="/prometheus.svg" alt="Logo" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,77,0,0.5)]" />
+            </div>
+            <p className="text-2xl font-medium tracking-wide text-foreground font-fjalla uppercase">
+              <span className="text-primary font-bold">Prometheus</span>
             </p>
           </a>
-          <button
-            onClick={() => router.push("/find/sign-in")}
-            className="relative inline-flex items-center justify-center text-base font-semibold tracking-base shadow ring-offset-background transition-colors focus-visible:outline-none disabled:opacity-50 border border-muted hover:bg-background/80 h-[42px] px-8 py-2 text-foreground"
-          >
-            log in
-          </button>
+          <a href="/find/sign-in">
+            <button className="relative inline-flex items-center justify-center text-sm uppercase tracking-widest font-bold transition-all focus-visible:outline-none disabled:opacity-50 border border-white/10 hover:border-primary/50 hover:bg-primary/10 hover:text-primary h-10 px-8 text-muted/80 hover:shadow-[0_0_20px_rgba(255,77,0,0.15)] rounded-sm font-fjalla glass">
+              log in
+            </button>
+          </a>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-full max-w-2xl">
+        <div className="flex-1 flex items-center justify-center py-12">
+          <div className="w-full max-w-lg animate-fade-in-up delay-200">
             {/* Title */}
-            <div className="text-center mb-12 -mt-16">
-              <h1 className="text-8xl font-extrabold tracking-tighter text-foreground font-inter mb-4">
+            <div className="text-center mb-10">
+              <h1 className="text-6xl md:text-7xl font-black tracking-tighter text-foreground font-fjalla leading-[0.85] uppercase drop-shadow-2xl mb-4">
                 be found.
               </h1>
-              <p className="text-lg font-medium leading-6 tracking-base text-primary">
-                Register to let opportunities come to you
+              <p className="text-lg font-light tracking-wide text-muted/80 font-inter">
+                Create your profile. Let the future find you.
               </p>
             </div>
 
-            {/* Registration Form */}
-            <form onSubmit={handleSubmit} className="p-8">
-              <div className="flex flex-col gap-6">
+            {/* Glass Card Form */}
+            <div className="glass-card p-8 md:p-10 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-6 relative z-10">
                 {error && (
-                  <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded">
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded text-sm font-inter">
                     {error}
                   </div>
                 )}
 
                 {/* Email */}
-                <div>
-                  <label className="block text-base font-semibold text-foreground mb-3">
-                    Email Address *
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Email Address
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-transparent border-0 border-b border-muted px-0 py-3 text-foreground outline-none focus:border-primary transition-colors placeholder:text-muted"
-                    placeholder="your.email@example.com"
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
+                    placeholder="name@example.com"
                   />
                 </div>
 
                 {/* Password */}
-                <div>
-                  <label className="block text-base font-semibold text-foreground mb-3">
-                    Password *
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Password (6+ chars)
                   </label>
                   <input
                     type="password"
@@ -199,135 +135,50 @@ export default function RegisterPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full bg-transparent border-0 border-b border-muted px-0 py-3 text-foreground outline-none focus:border-primary transition-colors placeholder:text-muted"
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
                     placeholder="••••••••"
                   />
                 </div>
 
                 {/* Phone */}
-                <div>
-                  <label className="block text-base font-semibold text-foreground mb-3">
-                    Phone Number *
+                <div className="group/input">
+                  <label className="block text-xs uppercase tracking-widest font-bold text-muted/60 mb-2 group-focus-within/input:text-primary transition-colors font-fjalla">
+                    Phone Number
                   </label>
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     required
-                    className="w-full bg-transparent border-0 border-b border-muted px-0 py-3 text-foreground outline-none focus:border-primary transition-colors placeholder:text-muted"
-                    placeholder="+1 (555) 123-4567"
+                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-foreground outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-inter placeholder:text-muted/20 rounded-t-sm"
+                    placeholder="+1 (555) 000-0000"
                   />
-                </div>
-
-                {/* CV Upload */}
-                <div>
-                  <label className="block text-base font-semibold text-foreground mb-3">
-                    Upload Your CV (Optional)
-                  </label>
-                  <p className="text-sm text-muted mb-3">
-                    Upload your CV and we'll automatically parse your information to save you time
-                  </p>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      id="cv-upload"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="cv-upload"
-                      className="flex items-center justify-center w-full bg-background border border-muted px-6 py-3 cursor-pointer hover:border-primary hover:bg-surface/50 transition-colors rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        {cvFile ? (
-                          <>
-                            <svg
-                              className="h-8 w-8 text-primary flex-shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                            <div className="text-left">
-                              <p className="text-foreground font-semibold">{cvFile.name}</p>
-                              <p className="text-sm text-muted">Click to change file</p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="h-8 w-8 text-muted flex-shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                              />
-                            </svg>
-                            <div className="text-left">
-                              <p className="text-foreground font-semibold">
-                                Click to upload or drag and drop
-                              </p>
-                              <p className="text-sm text-muted">PDF, DOC, DOCX (max 10MB)</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </label>
-                  </div>
                 </div>
 
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isUploading}
-                  className="bg-primary text-foreground px-8 py-4 font-semibold text-lg hover:brightness-95 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                  disabled={isLoading}
+                  className="mt-4 w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 uppercase tracking-widest transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,77,0,0.4)] hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed font-fjalla clip-diagonal"
                 >
-                  {isUploading ? (
+                  {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <svg
-                        className="animate-spin h-5 w-5"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      Processing...
+                      Creating Account...
                     </span>
                   ) : (
-                    "register & continue"
+                    "Create Account"
                   )}
                 </button>
 
-                <p className="text-sm text-muted text-center mt-2">
-                  By registering, you agree to our Terms of Service and Privacy Policy
+                <p className="text-xs text-muted/40 text-center font-inter mt-2">
+                  By registering, you agree to our Terms of Service.
                 </p>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       </div>
