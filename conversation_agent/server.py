@@ -4,17 +4,16 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 
-# Load env from conversation_agent/.env
-env_path = os.path.join(os.path.dirname(__file__), 'conversation_agent', '.env')
-load_dotenv(env_path)
+# Load env from .env in current directory
+load_dotenv('.env')
 
 # Try new LangGraph agent first, fall back to legacy
 try:
-    from conversation_agent.my_agent.langgraph_agent import run_search, set_company_profile
+    from my_agent.langgraph_agent import run_search, set_company_profile
     USE_LANGGRAPH = True
     print("✅ Using LangGraph agent")
 except ImportError as e:
-    from conversation_agent.my_agent.agent import progressive_search
+    from my_agent.agent import progressive_search
     USE_LANGGRAPH = False
     print(f"⚠️ Falling back to legacy agent: {e}")
 

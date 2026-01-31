@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Call the Python conversation agent server
-    const response = await fetch('http://127.0.0.1:5001/api/agent/search', {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+    const response = await fetch(`${backendUrl}/api/agent/search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
