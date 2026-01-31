@@ -6,7 +6,7 @@ import Sidebar from "@/components/sidebar";
 import MessageInput from "@/components/MessageInput";
 import Dashboard from "@/components/dashboard";
 import { supabase } from "@/lib/supabase";
-import { getCurrentUser, isAuthenticated } from "@/lib/auth";
+import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
 
 interface Message {
   id: string;
@@ -121,12 +121,13 @@ export default function ChatPage() {
   useEffect(() => {
     const loadConversation = async () => {
       try {
-        if (!isAuthenticated()) {
+        const authenticated = await isAuthenticatedAsync();
+        if (!authenticated) {
           router.push("/");
           return;
         }
 
-        const user = getCurrentUser();
+        const user = await getCurrentUserAsync();
         if (!user) {
           router.push("/");
           return;
@@ -265,8 +266,8 @@ export default function ChatPage() {
                   {msg.sender === 'ai' && <p className="text-primary text-base mb-1 px-6 text-left font-averia">Prometheus</p>}
                   <div
                     className={`rounded-lg px-6 py-3 ${msg.sender === 'user'
-                        ? 'w-full bg-primary text-foreground'
-                        : 'w-fit max-w-[70%] bg-transparent text-foreground'
+                      ? 'w-full bg-primary text-foreground'
+                      : 'w-fit max-w-[70%] bg-transparent text-foreground'
                       }`}
                   >
                     <p className={`text-sm ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>{msg.content}</p>

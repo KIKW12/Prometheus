@@ -27,6 +27,14 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
     print("⚠️ LangChain not installed. Run: pip install langchain-google-genai")
 
+# Supabase imports
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    print("⚠️ Supabase not installed. Run: pip install supabase")
+
 # Local imports
 from .progressive_filter import ProgressiveFilter
 from .semantic_engine import get_semantic_engine
@@ -48,14 +56,151 @@ class RecruitmentState(TypedDict):
 
 _progressive_filter: Optional[ProgressiveFilter] = None
 _company_profile: Optional[Dict[str, Any]] = None
+_supabase_client: Optional[Client] = None # Helper hint only, not used for actual type in runtime if missing
+
+
+def get_supabase() -> Optional[Client]:
+    """Get Supabase client."""
+    if not SUPABASE_AVAILABLE:
+        return None
+        
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    
+    if not url or not key:
+        print("⚠️ Supabase credentials missing (SUPABASE_URL, SUPABASE_KEY)")
+        return None
+        
+    return create_client(url, key)
+
+
+def load_candidates_from_supabase() -> List[Dict[str, Any]]:
+    """Fetch and transform candidates from Supabase."""
+    supabase = get_supabase()
+    if not supabase:
+        print("⚠️ Cannot load candidates: Supabase client unavailable")
+        return []
+        
+    try:
+        response = supabase.table('user_profiles').select("*").execute()
+        raw_profiles = response.data
+        
+        candidates = []
+        for p in raw_profiles:
+            profile_data = p.get('profile_data', {})
+            if not profile_data:
+                continue
+                
+            # Flatten structure
+            personal = profile_data.get('personal_info', {})
+            job_exp = profile_data.get('job_experience', [])
+            education = profile_data.get('education', [])
+            skills_raw = profile_data.get('skills', "")
+            
+            # Parse skills string if needed
+            if isinstance(skills_raw, str):
+                skills = [s.strip() for s in skills_raw.split(',') if s.strip()]
+            else:
+                skills = skills_raw if isinstance(skills_raw, list) else []
+                
+            # Calculate total years and infer level
+            total_months = 0
+            from datetime import datetime
+            today = datetime.now()
+            
+            for job in job_exp:
+                try:
+                    start_str = job.get('start_date') or job.get('startDate')
+                    if not start_str: continue
+                    
+                    # Parse start date
+                    start_date = None
+                    for fmt in ['%B %Y', '%Y-%m-%d', '%Y-%m', '%m/%Y', '%Y']:
+                        try:
+                            start_date = datetime.strptime(start_str, fmt)
+                            break
+                        except: continue
+                        
+                    if not start_date: continue
+                    
+                    # Parse end date
+                    end_str = job.get('end_date') or job.get('endDate') or 'Present'
+                    if end_str.lower() in ['present', 'current', 'now']:
+                        end_date = today
+                    else:
+                        end_date = None
+                        for fmt in ['%B %Y', '%Y-%m-%d', '%Y-%m', '%m/%Y', '%Y']:
+                            try:
+                                end_date = datetime.strptime(end_str, fmt)
+                                break
+                            except: continue
+                        if not end_date: end_date = today # Fallback
+                        
+                    # Calculate duration
+                    months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+                    if months > 0:
+                        total_months += months
+                except:
+                    continue
+            
+            total_years = round(total_months / 12, 1)
+            
+            # Infer experience level
+            if total_years >= 5:
+                experience_level = "senior"
+            elif total_years >= 2:
+                experience_level = "mid"
+            else:
+                experience_level = "junior"
+            
+            candidate = {
+                "id": p.get('user_id'),
+                "name": personal.get('name', 'Unknown'),
+                "email": p.get('email', personal.get('email', "")),
+                "phone": p.get('phone', personal.get('phone', "")),
+                "skills": skills,
+                "total_years": total_years,
+                "experience_level": experience_level,
+                "availability": "full-time", # Default
+                "location": personal.get('location', ""),
+                "bio": personal.get('about', ""),
+                "profileImage": personal.get('image', ""),
+                "job_experience": job_exp,
+                "education": education,
+                "profileQuestionnaire": profile_data.get('profile_questionnaire', {}),
+                # Keep raw data too
+                "profile_data": profile_data
+            }
+            
+            # Recalculate years from ProgressiveFilter logic logic later or here
+            # For now, let's just make sure we capture the data
+            
+            candidates.append(candidate)
+            
+        print(f"✅ Loaded {len(candidates)} candidates from Supabase")
+        return candidates
+        
+    except Exception as e:
+        print(f"❌ Error loading candidates: {e}")
+        return []
 
 
 def get_progressive_filter() -> ProgressiveFilter:
     """Get or create the progressive filter singleton."""
     global _progressive_filter
     if _progressive_filter is None:
-        _progressive_filter = ProgressiveFilter()
-        # Load candidates (will be done from Firebase in agent.py)
+        print("🔄 Initializing ProgressiveFilter and loading candidates...")
+        candidates = load_candidates_from_supabase()
+        _progressive_filter = ProgressiveFilter(candidates)
+        
+        # If we loaded candidates, we should also pre-calculate their embeddings
+        if candidates:
+            semantic = get_semantic_engine()
+            print("🧠 Generating embeddings for candidates...")
+            for c in candidates:
+                semantic.embed_candidate_profile(c)
+            print("✅ Embeddings generated")
+            
     return _progressive_filter
 
 

@@ -1,6 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+import os
+from dotenv import load_dotenv
+
+# Load env from conversation_agent/.env
+env_path = os.path.join(os.path.dirname(__file__), 'conversation_agent', '.env')
+load_dotenv(env_path)
+
 # Try new LangGraph agent first, fall back to legacy
 try:
     from conversation_agent.my_agent.langgraph_agent import run_search, set_company_profile
