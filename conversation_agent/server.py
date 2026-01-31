@@ -68,5 +68,8 @@ def health():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    # Bind to 0.0.0.0 to allow external access (required for Render)
+    # Default to 5001 as requested, but respect PORT env var if set
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=True)
 
