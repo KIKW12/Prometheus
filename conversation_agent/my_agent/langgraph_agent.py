@@ -56,10 +56,10 @@ class RecruitmentState(TypedDict):
 
 _progressive_filter: Optional[ProgressiveFilter] = None
 _company_profile: Optional[Dict[str, Any]] = None
-_supabase_client: Optional[Client] = None # Helper hint only, not used for actual type in runtime if missing
+_supabase_client: Optional["Client"] = None  # Forward ref to avoid NameError if supabase not installed
 
 
-def get_supabase() -> Optional[Client]:
+def get_supabase() -> Optional["Client"]:
     """Get Supabase client."""
     if not SUPABASE_AVAILABLE:
         return None
