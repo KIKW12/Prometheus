@@ -1,1 +1,1 @@
-web: gunicorn --bind 0.0.0.0:8080 --chdir conversation_agent server:app
+web: cd conversation_agent && gunicorn --bind 0.0.0.0:8080 server:app
