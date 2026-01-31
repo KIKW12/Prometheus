@@ -69,7 +69,7 @@ def health():
 
 if __name__ == '__main__':
     # Bind to 0.0.0.0 to allow external access (required for Render)
-    # Default to 5001 as requested, but respect PORT env var if set
-    port = int(os.environ.get('PORT', 5001))
+    # Default to 8080 to match Digital Ocean, but respect PORT env var if set
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
 
