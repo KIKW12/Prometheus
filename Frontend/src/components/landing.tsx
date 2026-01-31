@@ -138,9 +138,24 @@ export default function Landing() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
               {[
-                { icon: Search, title: "Create Profile", step: "01" },
-                { icon: UserCheck, title: "Get Matched", step: "02" },
-                { icon: MessageSquare, title: "Connect", step: "03" }
+                {
+                  icon: Search,
+                  title: "Create Profile",
+                  step: "01",
+                  description: "Join in minutes. Prospects simply upload a resume, while recruiters set up their company profile. A few smart questions, and our AI is ready to work."
+                },
+                {
+                  icon: UserCheck,
+                  title: "Get Matched",
+                  step: "02",
+                  description: "Search at the speed of thought. Recruiters chat directly with our AI agent to filter, vet, and shortlist the perfect candidates instantly."
+                },
+                {
+                  icon: MessageSquare,
+                  title: "Connect",
+                  step: "03",
+                  description: "No barriers, just results. When the right match is found, connect directly to schedule interviews and hire, seamlessly."
+                }
               ].map((item, i) => (
                 <div key={i} className="flex flex-col items-center text-center relative z-10">
                   <div className="w-24 h-24 rounded-full glass flex items-center justify-center mb-8 border border-primary/30 group hover:scale-110 transition-transform duration-500 hover:shadow-[0_0_40px_rgba(255,77,0,0.3)]">
@@ -151,7 +166,7 @@ export default function Landing() {
                   </div>
                   <h3 className="text-3xl font-fjalla uppercase mb-4 relative z-10">{item.title}</h3>
                   <p className="text-muted max-w-xs font-inter font-light">
-                    Simple steps to get you where you need to be. No friction, just results.
+                    {item.description}
                   </p>
                 </div>
               ))}
