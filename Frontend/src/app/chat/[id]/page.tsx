@@ -5,8 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import MessageInput from "@/components/MessageInput";
 import Dashboard from "@/components/dashboard";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
 import { getCurrentUser, isAuthenticated } from "@/lib/auth";
 
 interface Message {
@@ -68,11 +67,17 @@ export default function ChatPage() {
       };
       setConversation(updatedConversation);
 
-      // Update Firestore
+      // Update Supabase
       try {
-        await updateDoc(doc(db, "conversations", conv.id), {
-          messages: updatedConversation.messages
-        });
+        await supabase
+          .from('conversations')
+          .update({
+            messages: updatedConversation.messages.map(m => ({
+              ...m,
+              timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
+            }))
+          })
+          .eq('id', conv.id);
       } catch (error) {
         console.error("Error updating conversation:", error);
       }
@@ -93,11 +98,17 @@ export default function ChatPage() {
       };
       setConversation(updatedConversation);
 
-      // Update Firestore
+      // Update Supabase
       try {
-        await updateDoc(doc(db, "conversations", conv.id), {
-          messages: updatedConversation.messages
-        });
+        await supabase
+          .from('conversations')
+          .update({
+            messages: updatedConversation.messages.map(m => ({
+              ...m,
+              timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
+            }))
+          })
+          .eq('id', conv.id);
       } catch (error) {
         console.error("Error updating conversation:", error);
       }
@@ -106,7 +117,7 @@ export default function ChatPage() {
     }
   };
 
-  // Load conversation from Firestore
+  // Load conversation from Supabase
   useEffect(() => {
     const loadConversation = async () => {
       try {
@@ -121,26 +132,31 @@ export default function ChatPage() {
           return;
         }
 
-        const conversationsRef = collection(db, "conversations");
-        const q = query(conversationsRef, where("userId", "==", user.userId));
-        const querySnapshot = await getDocs(q);
-        const conversations: Conversation[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          conversations.push({
-            id: doc.id,
-            title: data.title,
-            timestamp: data.timestamp.toDate(),
-            type: data.type,
-            messages: data.messages?.map((msg: any) => ({
-              ...msg,
-              timestamp: msg.timestamp.toDate()
-            })) || []
-          });
-        });
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', chatId)
+          .eq('user_id', user.userId)
+          .single();
 
-        const currentConversation = conversations.find((conv) => conv.id === chatId);
-        if (currentConversation) {
+        if (error) {
+          console.error("Error loading conversation:", error);
+          router.push("/find");
+          return;
+        }
+
+        if (data) {
+          const currentConversation: Conversation = {
+            id: data.id,
+            title: data.title,
+            timestamp: new Date(data.timestamp),
+            type: data.type,
+            messages: (data.messages || []).map((msg: any) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }))
+          };
+
           // Check if conversation has messages
           if (currentConversation.messages.length === 0) {
             // Empty conversation, redirect to find
@@ -176,7 +192,7 @@ export default function ChatPage() {
     loadConversation();
   }, [chatId, router]);
 
-    // Scroll to bottom when new messages are added
+  // Scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation?.messages]);
@@ -198,11 +214,17 @@ export default function ChatPage() {
     };
     setConversation(updatedConversation);
 
-    // Update Firestore
+    // Update Supabase
     try {
-      await updateDoc(doc(db, "conversations", conversation.id), {
-        messages: updatedConversation.messages
-      });
+      await supabase
+        .from('conversations')
+        .update({
+          messages: updatedConversation.messages.map(m => ({
+            ...m,
+            timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
+          }))
+        })
+        .eq('id', conversation.id);
     } catch (error) {
       console.error("Error updating conversation:", error);
     }
@@ -242,11 +264,10 @@ export default function ChatPage() {
                 <div className="flex flex-col">
                   {msg.sender === 'ai' && <p className="text-primary text-base mb-1 px-6 text-left font-averia">Prometheus</p>}
                   <div
-                    className={`rounded-lg px-6 py-3 ${
-                      msg.sender === 'user'
+                    className={`rounded-lg px-6 py-3 ${msg.sender === 'user'
                         ? 'w-full bg-primary text-foreground'
                         : 'w-fit max-w-[70%] bg-transparent text-foreground'
-                    }`}
+                      }`}
                   >
                     <p className={`text-sm ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>{msg.content}</p>
                   </div>

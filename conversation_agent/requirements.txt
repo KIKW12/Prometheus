@@ -9,8 +9,8 @@ langchain-core>=0.2.0
 # Semantic Matching  
 sentence-transformers>=2.2.0
 
-# Firebase Admin SDK for Python
-firebase-admin>=6.0.0
+# Supabase Python Client (replaces Firebase)
+supabase>=2.0.0
 
 # Date utilities
 python-dateutil>=2.8.2

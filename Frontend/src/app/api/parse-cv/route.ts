@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL = process.env.GENAI_MODEL || "gemini-2.0-flash-exp";
+const MODEL = process.env.GENAI_MODEL || "gemini-3-flash-preview";
 const MAX_RETRIES = 3;
 
 const CODE_FENCE_PATTERN = /^\s*```(?:json)?\s*|\s*```\s*$/gi;
@@ -18,7 +18,7 @@ const EXTRACT_PROMPT = `Extract the following information from the CV PDF and re
 
 function parseJsonResponse(text: string) {
   const cleaned = text.replace(CODE_FENCE_PATTERN, "").trim();
-  
+
   try {
     return JSON.parse(cleaned);
   } catch {
@@ -28,7 +28,7 @@ function parseJsonResponse(text: string) {
       .replace(/:\s*'/g, ': "')         // single quotes in values
       .replace(/',/g, '",')             // single quotes before commas
       .replace(/'\s*}/g, '"}');         // single quotes before braces
-    
+
     try {
       return JSON.parse(recovered);
     } catch {

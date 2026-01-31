@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import Dashboard from "@/components/dashboard";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import { getCurrentUser, isAuthenticated } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
 
 interface CompanyDetails {
   companyName: string;
@@ -23,41 +22,56 @@ export default function FindPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check authentication first
-    if (!isAuthenticated()) {
-      router.push("/");
-      return;
-    }
+    const loadData = async () => {
+      // Check authentication first
+      const authenticated = await isAuthenticatedAsync();
+      if (!authenticated) {
+        router.push("/find/sign-up");
+        return;
+      }
 
-    const user = getCurrentUser();
-    if (!user) {
-      router.push("/");
-      return;
-    }
+      const user = await getCurrentUserAsync();
+      if (!user) {
+        router.push("/find/sign-up");
+        return;
+      }
 
-    // Load company details from Firebase using user ID
-    const loadCompanyDetails = async () => {
+      // Load company details from Supabase using user ID
       try {
-        const docRef = doc(db, "companyProfiles", user.userId);
-        const docSnap = await getDoc(docRef);
+        const { data, error } = await supabase
+          .from('company_profiles')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single();
 
-        if (docSnap.exists()) {
-          const data = docSnap.data() as CompanyDetails;
-          setCompanyDetails(data);
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading company details:", error);
+          router.push("/find/company-details");
+          return;
+        }
+
+        if (data) {
+          setCompanyDetails({
+            companyName: data.company_name || "",
+            userName: data.user_name || "",
+            userRole: data.user_role || "",
+            companySize: data.company_size || "",
+            industry: data.industry || "",
+            description: data.description || "",
+          });
+          setIsLoading(false);
         } else {
-          // Redirect to sign-up if no company details found
-          router.push("/find/sign-up");
+          // Redirect to company-details if no profile found
+          router.push("/find/company-details");
           return;
         }
       } catch (error) {
         console.error("Error loading company details:", error);
-        router.push("/find/sign-up");
+        router.push("/find/company-details");
       }
-
-      setIsLoading(false);
     };
 
-    loadCompanyDetails();
+    loadData();
   }, [router]);
 
   if (isLoading) {

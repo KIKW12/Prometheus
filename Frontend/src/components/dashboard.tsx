@@ -1,9 +1,8 @@
 import TeamCarousel from './TeamCarousel';
 import MessageInput from './MessageInput';
 import { useRouter } from 'next/navigation';
-import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, arrayUnion } from "firebase/firestore";
-import { getCurrentUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserAsync } from "@/lib/auth";
 
 interface DashboardProps {
   conversationId?: string;
@@ -42,25 +41,37 @@ export default function Dashboard({ conversationId }: DashboardProps) {
 
   const handleSendMessage = async (message: string) => {
     try {
-      const user = getCurrentUser();
+      const user = await getCurrentUserAsync();
       if (!user) {
         router.push("/");
         return;
       }
 
       if (conversationId) {
-        // Update existing conversation
-        const conversationRef = doc(db, "conversations", conversationId);
+        // Update existing conversation - get current messages and append
+        const { data: existingConv, error: fetchError } = await supabase
+          .from('conversations')
+          .select('messages')
+          .eq('id', conversationId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
         const newMessage = {
           id: Date.now().toString(),
           content: message,
           sender: 'user' as const,
-          timestamp: new Date()
+          timestamp: new Date().toISOString()
         };
 
-        await updateDoc(conversationRef, {
-          messages: arrayUnion(newMessage)
-        });
+        const updatedMessages = [...(existingConv?.messages || []), newMessage];
+
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update({ messages: updatedMessages })
+          .eq('id', conversationId);
+
+        if (updateError) throw updateError;
 
         // Also update localStorage
         const existingConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
@@ -77,34 +88,43 @@ export default function Dashboard({ conversationId }: DashboardProps) {
       const title = message.length > 50 ? message.substring(0, 50) + '...' : message;
 
       // Check if a conversation with this title already exists for this user
-      const conversationsRef = collection(db, "conversations");
-      const q = query(conversationsRef, where("title", "==", title), where("userId", "==", user.userId));
-      const querySnapshot = await getDocs(q);
+      const { data: existingConvs, error: searchError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('title', title)
+        .eq('user_id', user.userId);
 
-      if (!querySnapshot.empty) {
+      if (searchError) throw searchError;
+
+      if (existingConvs && existingConvs.length > 0) {
         // Conversation already exists, navigate to it
-        const existingConversation = querySnapshot.docs[0];
-        router.push(`/chat/${existingConversation.id}`);
+        router.push(`/chat/${existingConvs[0].id}`);
         return;
       }
 
-      // Create new conversation in Firestore
-      const docRef = await addDoc(collection(db, "conversations"), {
-        title: title,
-        timestamp: new Date(),
-        type: 'job_search' as const,
-        userId: user.userId,
-        messages: [{
-          id: Date.now().toString(),
-          content: message,
-          sender: 'user' as const,
-          timestamp: new Date()
-        }]
-      });
+      // Create new conversation in Supabase
+      const { data: newConv, error: insertError } = await supabase
+        .from('conversations')
+        .insert({
+          title: title,
+          timestamp: new Date().toISOString(),
+          type: 'job_search',
+          user_id: user.userId,
+          messages: [{
+            id: Date.now().toString(),
+            content: message,
+            sender: 'user',
+            timestamp: new Date().toISOString()
+          }]
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
 
       // Also save to localStorage for consistency
       const newConversation = {
-        id: docRef.id,
+        id: newConv.id,
         title: title,
         timestamp: new Date(),
         type: 'job_search' as const,
@@ -121,7 +141,7 @@ export default function Dashboard({ conversationId }: DashboardProps) {
       localStorage.setItem('conversations', JSON.stringify(updatedConversations));
 
       // Navigate to the new chat
-      router.push(`/chat/${docRef.id}`);
+      router.push(`/chat/${newConv.id}`);
     } catch (error) {
       console.error("Error creating conversation:", error);
       // Fallback: create in localStorage only
@@ -148,108 +168,10 @@ export default function Dashboard({ conversationId }: DashboardProps) {
   };
 
   const handleButtonClick = async (buttonText: string) => {
-    try {
-      const user = getCurrentUser();
-      if (!user) {
-        router.push("/");
-        return;
-      }
-
-      if (conversationId) {
-        // Update existing conversation
-        const conversationRef = doc(db, "conversations", conversationId);
-        const newMessage = {
-          id: Date.now().toString(),
-          content: buttonText,
-          sender: 'user' as const,
-          timestamp: new Date()
-        };
-
-        await updateDoc(conversationRef, {
-          messages: arrayUnion(newMessage)
-        });
-
-        // Also update localStorage
-        const existingConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        const conversationIndex = existingConversations.findIndex((conv: any) => conv.id === conversationId);
-        if (conversationIndex !== -1) {
-          existingConversations[conversationIndex].messages.push(newMessage);
-          localStorage.setItem('conversations', JSON.stringify(existingConversations));
-        }
-
-        // Stay on the same page - no navigation needed
-        return;
-      }
-
-      // Check if a conversation with this title already exists for this user
-      const conversationsRef = collection(db, "conversations");
-      const q = query(conversationsRef, where("title", "==", buttonText), where("userId", "==", user.userId));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // Conversation already exists, navigate to it
-        const existingConversation = querySnapshot.docs[0];
-        router.push(`/chat/${existingConversation.id}`);
-        return;
-      }
-
-      // Create new conversation in Firestore
-      const docRef = await addDoc(collection(db, "conversations"), {
-        title: buttonText,
-        timestamp: new Date(),
-        type: 'job_search' as const,
-        userId: user.userId,
-        messages: [{
-          id: Date.now().toString(),
-          content: buttonText,
-          sender: 'user' as const,
-          timestamp: new Date()
-        }]
-      });
-
-      // Also save to localStorage for consistency
-      const newConversation = {
-        id: docRef.id,
-        title: buttonText,
-        timestamp: new Date(),
-        type: 'job_search' as const,
-        messages: [{
-          id: Date.now().toString(),
-          content: buttonText,
-          sender: 'user' as const,
-          timestamp: new Date()
-        }]
-      };
-
-      const existingConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-      const updatedConversations = [newConversation, ...existingConversations];
-      localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-
-      // Navigate to the new chat
-      router.push(`/chat/${docRef.id}`);
-    } catch (error) {
-      console.error("Error creating conversation:", error);
-      // Fallback: create in localStorage only
-      const newConversation = {
-        id: Date.now().toString(),
-        title: buttonText,
-        timestamp: new Date(),
-        type: 'job_search' as const,
-        messages: [{
-          id: Date.now().toString(),
-          content: buttonText,
-          sender: 'user' as const,
-          timestamp: new Date()
-        }]
-      };
-
-      const existingConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-      const updatedConversations = [newConversation, ...existingConversations];
-      localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-
-      router.push(`/chat/${newConversation.id}`);
-    }
+    // Reuse handleSendMessage logic
+    await handleSendMessage(buttonText);
   };
+
   return (
     <main className="flex w-full flex-1 flex-col md:pl-[272px] lg:pr-0">
       <div className="pt-8 h-[calc(100dvh-7px)] flex flex-col gap-16">
@@ -264,45 +186,45 @@ export default function Dashboard({ conversationId }: DashboardProps) {
             {/* Carousel for top-Buttons */}
             <div className="relative button-carousel-container" role="region" aria-roledescription="carousel">
               <div className="gap-4 top-button-carousel">
-                  <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
-                  <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
-                  <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
-                  <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
-                  <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
-                  <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
-                  <button onClick={() => handleButtonClick("who are some people i should invest in?")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">who are some people i should invest in?</button>
-                  <button onClick={() => handleButtonClick("tell me the legend of naveed")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">tell me the legend of naveed</button>
-                  <button onClick={() => handleButtonClick("i'm building in gaming")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">i'm building in gaming</button>
-                  <button onClick={() => handleButtonClick("show me fast growing projects")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-1 py-1 text-foreground hover:text-primary border-muted">show me fast growing projects</button>
-                  {/* Duplicate buttons for infinite loop */}
-                  <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
-                  <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
-                  <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
-                  <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
-                  <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
-                  <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
+                <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
+                <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
+                <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
+                <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
+                <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
+                <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
+                <button onClick={() => handleButtonClick("who are some people i should invest in?")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">who are some people i should invest in?</button>
+                <button onClick={() => handleButtonClick("tell me the legend of naveed")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">tell me the legend of naveed</button>
+                <button onClick={() => handleButtonClick("i'm building in gaming")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">i'm building in gaming</button>
+                <button onClick={() => handleButtonClick("show me fast growing projects")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-1 py-1 text-foreground hover:text-primary border-muted">show me fast growing projects</button>
+                {/* Duplicate buttons for infinite loop */}
+                <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
+                <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
+                <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
+                <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
+                <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
+                <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
               </div>
             </div>
             {/* Carousel for bottom-Buttons */}
-              <div className="relative button-carousel-container" role="region" aria-roledescription="carousel">
+            <div className="relative button-carousel-container" role="region" aria-roledescription="carousel">
               <div className="gap-4 bottom-button-carousel">
-                  <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
-                  <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
-                  <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
-                  <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
-                  <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
-                  <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
-                  <button onClick={() => handleButtonClick("who are some people i should invest in?")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">who are some people i should invest in?</button>
-                  <button onClick={() => handleButtonClick("tell me the legend of naveed")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">tell me the legend of naveed</button>
-                  <button onClick={() => handleButtonClick("i'm building in gaming")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">i'm building in gaming</button>
-                  <button onClick={() => handleButtonClick("show me fast growing projects")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-1 py-1 text-foreground hover:text-primary border-muted">show me fast growing projects</button>
-                  {/* Duplicate buttons for infinite loop */}
-                  <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
-                  <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
-                  <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
-                  <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
-                  <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
-                  <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
+                <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
+                <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
+                <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
+                <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
+                <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
+                <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
+                <button onClick={() => handleButtonClick("who are some people i should invest in?")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">who are some people i should invest in?</button>
+                <button onClick={() => handleButtonClick("tell me the legend of naveed")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">tell me the legend of naveed</button>
+                <button onClick={() => handleButtonClick("i'm building in gaming")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">i'm building in gaming</button>
+                <button onClick={() => handleButtonClick("show me fast growing projects")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-1 py-1 text-foreground hover:text-primary border-muted">show me fast growing projects</button>
+                {/* Duplicate buttons for infinite loop */}
+                <button onClick={() => handleButtonClick("looking for a marketer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">looking for a marketer</button>
+                <button onClick={() => handleButtonClick("show me hardware people")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me hardware people</button>
+                <button onClick={() => handleButtonClick("need a producer for my album")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">need a producer for my album</button>
+                <button onClick={() => handleButtonClick("i need to hire a react engineer")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border border-muted px-4 py-1 text-foreground hover:text-primary border-muted">i need to hire a react engineer</button>
+                <button onClick={() => handleButtonClick("show me content creators")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">show me content creators</button>
+                <button onClick={() => handleButtonClick("experts on tiktok")} className="button-item hover:text-white h-10 flex-shrink-0 cursor-pointer border px-4 py-1 text-foreground hover:text-primary border-muted">experts on tiktok</button>
               </div>
             </div>
           </div>

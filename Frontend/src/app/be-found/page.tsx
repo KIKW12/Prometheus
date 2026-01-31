@@ -7,9 +7,8 @@ import ProfilePreview from "@/components/ProfilePreview";
 import CandidateQuestionnaire, {
   CandidateQuestionnaireData,
 } from "@/components/CandidateQuestionnaire";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { getCurrentUser, removeToken, isAuthenticated } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserAsync, signOut, isAuthenticatedAsync } from "@/lib/auth";
 
 
 export interface ProfileData {
@@ -99,27 +98,35 @@ export default function BeFoundPage() {
   };
 
   // Check authentication and load profile
+  // Check authentication and load profile
   useEffect(() => {
-    if (!isAuthenticated()) {
-      // If not authenticated, redirect to home or sign-in
-      router.push("/");
-      return;
-    }
-
-    const user = getCurrentUser();
-    if (!user) {
-      router.push("/");
-      return;
-    }
-
     const loadProfile = async () => {
-      try {
-        const docRef = doc(db, "userProfiles", user.userId);
-        const docSnap = await getDoc(docRef);
+      const authenticated = await isAuthenticatedAsync();
+      if (!authenticated) {
+        router.push("/");
+        return;
+      }
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const sanitizedData = sanitizeProfileData(data.profileData);
+      const user = await getCurrentUserAsync();
+      if (!user) {
+        router.push("/");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading profile:", error);
+          return;
+        }
+
+        if (data) {
+          const sanitizedData = sanitizeProfileData(data.profile_data);
           setProfileData(sanitizedData);
           setEmail(data.email || "");
           setPhone(data.phone || "");
@@ -135,18 +142,24 @@ export default function BeFoundPage() {
   }, [router]);
 
   const saveProfile = async () => {
-    const user = getCurrentUser();
+    const user = await getCurrentUserAsync();
     if (!user) return;
 
     setIsSaving(true);
     try {
       const sanitizedData = sanitizeProfileData(profileData);
-      await setDoc(doc(db, "userProfiles", user.userId), {
-        profileData: sanitizedData,
-        email,
-        phone,
-        updatedAt: new Date()
-      });
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: user.userId,
+          profile_data: sanitizedData,
+          email,
+          phone,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
       // Update original data after successful save
       setOriginalProfileData(JSON.parse(JSON.stringify(sanitizedData)));
       alert("Profile saved successfully!");
@@ -158,8 +171,8 @@ export default function BeFoundPage() {
     }
   };
 
-  const handleLogout = () => {
-    removeToken();
+  const handleLogout = async () => {
+    await signOut();
     router.push("/");
   };
 
@@ -249,8 +262,8 @@ export default function BeFoundPage() {
           <button
             onClick={() => setActiveTab("profile")}
             className={`pb-3 px-1 font-medium transition-colors ${activeTab === "profile"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted hover:text-foreground"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted hover:text-foreground"
               }`}
           >
             Profile
@@ -258,8 +271,8 @@ export default function BeFoundPage() {
           <button
             onClick={() => setActiveTab("questionnaire")}
             className={`pb-3 px-1 font-medium transition-colors ${activeTab === "questionnaire"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted hover:text-foreground"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted hover:text-foreground"
               }`}
           >
             Culture Questionnaire
@@ -267,8 +280,8 @@ export default function BeFoundPage() {
           <button
             onClick={() => setActiveTab("preview")}
             className={`pb-3 px-1 font-medium transition-colors ${activeTab === "preview"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted hover:text-foreground"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted hover:text-foreground"
               }`}
           >
             Preview

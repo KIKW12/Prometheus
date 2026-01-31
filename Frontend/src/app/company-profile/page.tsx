@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
 import CompanyQuestionnaire, {
   CompanyQuestionnaireData,
 } from "@/components/CompanyQuestionnaire";
+import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
+
 
 interface CompanyDetails {
   companyName: string;
@@ -49,21 +50,48 @@ export default function CompanyProfilePage() {
 
   useEffect(() => {
     const loadCompanyDetails = async () => {
-      try {
-        const docRef = doc(db, "companyProfiles", "default");
-        const docSnap = await getDoc(docRef);
+      // Check authentication first
+      const authenticated = await isAuthenticatedAsync();
+      if (!authenticated) {
+        router.push("/find/sign-up");
+        return;
+      }
 
-        if (docSnap.exists()) {
-          const data = docSnap.data() as CompanyDetails;
-          setDetails(data);
-        } else {
-          // If no company details exist, redirect to sign-up
-          router.push("/find/sign-up");
-          return;
+      const user = await getCurrentUserAsync();
+      if (!user) {
+        router.push("/find/sign-up");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('company_profiles')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading company details:", error);
+          // Don't redirect on error, just log it. Maybe it really doesn't exist yet.
+        }
+
+        if (data) {
+          setDetails({
+            companyName: data.company_name || "",
+            userName: data.user_name || "",
+            userRole: data.user_role || "",
+            companySize: data.company_size || "",
+            industry: data.industry || "",
+            description: data.description || "",
+            cultureQuestionnaire: data.culture_questionnaire,
+          });
+
+          if (data.culture_questionnaire) {
+            setQuestionnaireData(data.culture_questionnaire);
+          }
         }
       } catch (error) {
         console.error("Error loading company details:", error);
-        router.push("/find/sign-up");
       }
       setIsLoading(false);
     };
@@ -80,11 +108,28 @@ export default function CompanyProfilePage() {
     setIsSubmitting(true);
 
     try {
-      // Update company details in Firestore
-      await setDoc(doc(db, "companyProfiles", "default"), {
-        ...details,
-        updatedAt: new Date()
-      });
+      const user = await getCurrentUserAsync();
+      if (!user) {
+        router.push("/find/sign-up");
+        return;
+      }
+
+      // Update company details in Supabase
+      const { error } = await supabase
+        .from('company_profiles')
+        .upsert({
+          user_id: user.userId,
+          company_name: details.companyName,
+          user_name: details.userName,
+          user_role: details.userRole,
+          company_size: details.companySize,
+          industry: details.industry,
+          description: details.description,
+          culture_questionnaire: activeTab === 'culture' ? questionnaireData : details.cultureQuestionnaire,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
 
       // Navigate back to find page
       router.push("/find");

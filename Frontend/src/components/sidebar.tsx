@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore";
-import { getCurrentUser, isAuthenticated } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
 
 interface Conversation {
   id: string;
@@ -22,41 +21,47 @@ export default function Sidebar() {
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  // Load conversations from Firestore on mount
+  // Load conversations from Supabase on mount
   useEffect(() => {
     const loadConversations = async () => {
       try {
-        if (!isAuthenticated()) {
+        const authenticated = await isAuthenticatedAsync();
+        if (!authenticated) {
           setConversations([]);
           return;
         }
 
-        const user = getCurrentUser();
+        const user = await getCurrentUserAsync();
         if (!user) {
           setConversations([]);
           return;
         }
 
-        const conversationsRef = collection(db, "conversations");
-        const q = query(conversationsRef, where("userId", "==", user.userId));
-        const querySnapshot = await getDocs(q);
-        const loadedConversations: Conversation[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          // Only include conversations that have messages
-          if (data.messages && data.messages.length > 0) {
-            loadedConversations.push({
-              id: doc.id,
-              title: data.title,
-              timestamp: data.timestamp.toDate(),
-              type: data.type
-            });
-          }
-        });
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('user_id', user.userId)
+          .not('messages', 'is', null);
+
+        if (error) {
+          console.error("Error loading conversations:", error);
+          setConversations([]);
+          return;
+        }
+
+        const loadedConversations: Conversation[] = (data || [])
+          .filter(row => row.messages && row.messages.length > 0)
+          .map(row => ({
+            id: row.id,
+            title: row.title,
+            timestamp: new Date(row.timestamp),
+            type: row.type
+          }));
+
         setConversations(loadedConversations);
       } catch (error) {
         console.error("Error loading conversations:", error);
-        // Fallback to sample data if Firestore fails
+        // Fallback to sample data if Supabase fails
         const sampleConversations: Conversation[] = [
           {
             id: "1",
@@ -108,7 +113,13 @@ export default function Sidebar() {
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      await deleteDoc(doc(db, "conversations", conversationId));
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
       const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
       setConversations(updatedConversations);
       setOpenMenuId(null);
@@ -126,9 +137,13 @@ export default function Sidebar() {
   const saveEdit = async (conversationId: string) => {
     if (editingTitle.trim()) {
       try {
-        await updateDoc(doc(db, "conversations", conversationId), {
-          title: editingTitle.trim()
-        });
+        const { error } = await supabase
+          .from('conversations')
+          .update({ title: editingTitle.trim() })
+          .eq('id', conversationId);
+
+        if (error) throw error;
+
         const updatedConversations = conversations.map(conv =>
           conv.id === conversationId ? { ...conv, title: editingTitle.trim() } : conv
         );

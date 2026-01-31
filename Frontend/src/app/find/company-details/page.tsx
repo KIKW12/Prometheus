@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
-import { getCurrentUser, isAuthenticated } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
 
 interface CompanyDetails {
   companyName: string;
@@ -26,13 +25,19 @@ export default function CompanyDetailsPage() {
     description: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication on mount
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/");
-      return;
-    }
+    const checkAuth = async () => {
+      const authenticated = await isAuthenticatedAsync();
+      if (!authenticated) {
+        router.push("/find/sign-up");
+        return;
+      }
+      setIsLoading(false);
+    };
+    checkAuth();
   }, [router]);
 
   const handleInputChange = (field: keyof CompanyDetails, value: string) => {
@@ -44,19 +49,28 @@ export default function CompanyDetailsPage() {
     setIsSubmitting(true);
 
     try {
-      const user = getCurrentUser();
+      const user = await getCurrentUserAsync();
       if (!user) {
-        router.push("/");
+        router.push("/find/sign-up");
         return;
       }
 
-      // Save company details to Firebase using user ID
-      await setDoc(doc(db, "companyProfiles", user.userId), {
-        ...details,
-        userId: user.userId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      // Save company details to Supabase using user ID
+      const { error } = await supabase
+        .from('company_profiles')
+        .upsert({
+          user_id: user.userId,
+          company_name: details.companyName,
+          user_name: details.userName,
+          user_role: details.userRole,
+          company_size: details.companySize,
+          industry: details.industry,
+          description: details.description,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
 
       // Navigate to find page
       router.push("/find");
@@ -67,6 +81,14 @@ export default function CompanyDetailsPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   const companySizes = [
     "1-10 employees",
