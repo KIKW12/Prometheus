@@ -5,46 +5,45 @@ Handles embedding generation and matching for both candidates and companies.
 
 from typing import List, Dict, Any, Optional
 import numpy as np
+import os
 from functools import lru_cache
 
 try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    GOOGLE_EMBEDDINGS_AVAILABLE = True
 except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("⚠️ sentence-transformers not installed. Using fallback matching.")
-
+    GOOGLE_EMBEDDINGS_AVAILABLE = False
+    print("⚠️ langchain_google_genai not installed. Using fallback matching.")
 
 class SemanticEngine:
     """
     Bidirectional semantic matching engine.
     
-    Creates embeddings for:
-    - Candidate profiles (skills + questionnaire answers)
-    - Company profiles (culture questionnaire)
-    - Search queries (recruiter natural language)
-    
-    Matches from BOTH perspectives for mutual fit.
+    Creates embeddings using Google Cloud's lightweight API 
+    instead of heavy local models.
     """
     
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
+    def __init__(self, model_name: str = 'models/text-embedding-004'):
         """
-        Initialize the semantic engine.
-        
-        Args:
-            model_name: Sentence transformer model to use.
-                        'all-MiniLM-L6-v2' is fast and good for semantic similarity.
+        Initialize the semantic engine with Google Cloud Embeddings.
         """
         self.model = None
         self.model_name = model_name
         self._skill_embeddings_cache: Dict[str, np.ndarray] = {}
         
-        if SENTENCE_TRANSFORMERS_AVAILABLE:
-            try:
-                self.model = SentenceTransformer(model_name)
-                print(f"✅ Loaded semantic model: {model_name}")
-            except Exception as e:
-                print(f"⚠️ Failed to load model: {e}. Using fallback.")
+        if GOOGLE_EMBEDDINGS_AVAILABLE:
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if api_key:
+                try:
+                    self.model = GoogleGenerativeAIEmbeddings(
+                        model=model_name,
+                        google_api_key=api_key
+                    )
+                    print(f"✅ Loaded Google Cloud Embeddings: {model_name}")
+                except Exception as e:
+                    print(f"⚠️ Failed to init Google Embeddings: {e}")
+            else:
+                print("⚠️ No Google API Key found for embeddings.")
     
     # ========== CANDIDATE EMBEDDING ==========
     
@@ -468,10 +467,16 @@ class SemanticEngine:
     def _encode(self, text: str) -> np.ndarray:
         """Encode text to embedding vector."""
         if self.model is not None:
-            return self.model.encode(text, convert_to_numpy=True)
+            try:
+                # Google Embeddings returns a list, convert to numpy
+                embedding = self.model.embed_query(text)
+                return np.array(embedding, dtype=np.float32)
+            except Exception as e:
+                print(f"⚠️ Embedding error: {e}")
+                return self._fallback_encode(text)
         else:
-            # Fallback: simple hash-based pseudo-embedding
             return self._fallback_encode(text)
+
     
     def _fallback_encode(self, text: str) -> np.ndarray:
         """Fallback encoding when model not available."""
