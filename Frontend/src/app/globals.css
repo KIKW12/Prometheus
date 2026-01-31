@@ -179,3 +179,5 @@ body {
     transform: translateX(-50%);
   }
 }
+
+/* Old carousel styles removed - Framer Motion now handles animations */
