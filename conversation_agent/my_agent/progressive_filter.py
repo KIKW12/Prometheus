@@ -541,25 +541,56 @@ class ProgressiveFilter:
             'raw_query': query
         }
     
+    def _should_reset_for_new_specialty(self, new_skills: List[str]) -> bool:
+        """
+        Detect if the new query represents a completely different specialty.
+        If new skills have no overlap with previous skills, this is a new search.
+        """
+        if not self.conversation_history or not new_skills:
+            return False
+
+        # Get all skills from previous queries
+        previous_skills = set()
+        for turn in self.conversation_history:
+            prev_skills = turn.get('requirements', {}).get('skills', [])
+            previous_skills.update(s.lower() for s in prev_skills)
+
+        if not previous_skills:
+            return False
+
+        # Check if new skills overlap with previous skills
+        new_skills_lower = set(s.lower() for s in new_skills)
+        overlap = previous_skills.intersection(new_skills_lower)
+
+        # If no overlap, this is a completely new specialty search
+        return len(overlap) == 0
+
     def filter_candidates(self, query: str, min_score: float = 60.0) -> Dict[str, Any]:
         """
-        Progressive filtering: applies new query on top of existing filters
+        Progressive filtering: applies new query on top of existing filters.
+        Automatically resets if a completely different specialty is detected.
         """
         # Extract requirements from new query
         new_requirements = self._extract_requirements_from_query(query)
-        
+
+        # Check if this is a completely new specialty (no skill overlap with previous queries)
+        new_skills = new_requirements.get('skills', [])
+        if self._should_reset_for_new_specialty(new_skills):
+            print(f"🔄 Detected new specialty search, resetting filters...")
+            self.reset()
+
         # Add to conversation history
         self.conversation_history.append({
             'query': query,
             'requirements': new_requirements
         })
-        
+
         # Combine all requirements from conversation history
         all_skills = []
         final_experience_level = "any"
         final_work_preference = "any"
         final_location = "any"
-        
+
         for turn in self.conversation_history:
             reqs = turn['requirements']
             all_skills.extend(reqs.get('skills', []))

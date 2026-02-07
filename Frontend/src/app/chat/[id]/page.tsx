@@ -35,11 +35,12 @@ export default function ChatPage() {
   const [selectedProspect, setSelectedProspect] = useState<ProspectData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const generateAIResponse = async (conv: Conversation, userMessage: Message) => {
+  const generateAIResponse = async (conv: Conversation, userMessage: Message, isFirstMessage: boolean = false) => {
     setIsLoading(true);
 
     try {
       // Call the conversation agent API
+      // Reset conversation when it's the first message in a new chat
       const response = await fetch('/api/conversation', {
         method: 'POST',
         headers: {
@@ -48,7 +49,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: userMessage.content,
           conversationId: conv.id,
-          resetConversation: false, // Could be enhanced to detect reset commands
+          resetConversation: isFirstMessage,
         }),
       });
 
@@ -186,7 +187,9 @@ export default function ChatPage() {
 
             if (!hasAIReply) {
               // Generate AI response for the user message
-              generateAIResponse(currentConversation, lastMessage);
+              // If this is the only message, it's a new chat - reset the backend filter
+              const isNewChat = currentConversation.messages.length === 1;
+              generateAIResponse(currentConversation, lastMessage, isNewChat);
             }
           }
         } else {
