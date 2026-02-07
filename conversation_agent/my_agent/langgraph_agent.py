@@ -210,15 +210,10 @@ def get_progressive_filter() -> ProgressiveFilter:
         print("🔄 Initializing ProgressiveFilter and loading candidates...")
         candidates = load_candidates_from_supabase()
         _progressive_filter = ProgressiveFilter(candidates)
-        
-        # If we loaded candidates, we should also pre-calculate their embeddings
-        if candidates:
-            semantic = get_semantic_engine()
-            print("🧠 Generating embeddings for candidates...")
-            for c in candidates:
-                semantic.embed_candidate_profile(c)
-            print("✅ Embeddings generated")
-            
+        print(f"✅ ProgressiveFilter initialized with {len(candidates)} candidates")
+        # Note: Embeddings are generated lazily on-demand during search
+        # to avoid blocking the first request with 150+ API calls
+
     return _progressive_filter
 
 
