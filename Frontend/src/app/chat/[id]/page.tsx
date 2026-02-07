@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import MessageInput from "@/components/MessageInput";
 import Dashboard from "@/components/dashboard";
+import ProspectCard, { ProspectData } from "@/components/ProspectCard";
+import ProspectModal from "@/components/ProspectModal";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUserAsync, isAuthenticatedAsync } from "@/lib/auth";
 
@@ -29,6 +31,8 @@ export default function ChatPage() {
   const chatId = params.id as string;
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [candidates, setCandidates] = useState<ProspectData[]>([]);
+  const [selectedProspect, setSelectedProspect] = useState<ProspectData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const generateAIResponse = async (conv: Conversation, userMessage: Message) => {
@@ -53,6 +57,11 @@ export default function ChatPage() {
       }
 
       const data = await response.json();
+
+      // Store candidates if returned
+      if (data.candidates && data.candidates.length > 0) {
+        setCandidates(data.candidates);
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -289,6 +298,28 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
+
+            {/* Prospect Cards */}
+            {candidates.length > 0 && (
+              <div className="mt-6">
+                <p className="text-sm text-muted mb-3 px-1">Top matches:</p>
+                <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
+                  {candidates.slice(0, 5).map((prospect, index) => (
+                    <ProspectCard
+                      key={prospect.candidate_id}
+                      prospect={prospect}
+                      index={index}
+                      onViewProfile={(id) => {
+                        const p = candidates.find(c => c.candidate_id === id);
+                        if (p) setSelectedProspect(p);
+                      }}
+                      onContact={(p) => window.open(`mailto:${p.email}`, '_blank')}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
@@ -301,6 +332,13 @@ export default function ChatPage() {
           </div>
         </div>
       </main>
+
+      {/* Prospect Profile Modal */}
+      <ProspectModal
+        prospect={selectedProspect}
+        isOpen={selectedProspect !== null}
+        onClose={() => setSelectedProspect(null)}
+      />
     </>
   );
 }

@@ -181,3 +181,13 @@ body {
 }
 
 /* Old carousel styles removed - Framer Motion now handles animations */
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

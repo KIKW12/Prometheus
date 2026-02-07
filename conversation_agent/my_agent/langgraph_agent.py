@@ -153,6 +153,23 @@ def load_candidates_from_supabase() -> List[Dict[str, Any]]:
             else:
                 experience_level = "junior"
             
+            # Get work preference from profile (Remote, Hybrid, On-site, Flexible)
+            job_prefs = profile_data.get('job_preferences', {})
+            remote_pref = job_prefs.get('remote_preference', 'Flexible')
+            
+            # Map remote_preference to availability format
+            availability_map = {
+                'Remote': 'remote',
+                'Hybrid': 'hybrid', 
+                'On-site': 'on-site',
+                'Flexible': 'flexible',
+                'Full-time': 'full-time',
+                'Part-time': 'part-time',
+                'Contract': 'contract',
+                'Freelance': 'freelance'
+            }
+            availability = availability_map.get(remote_pref, 'flexible')
+            
             candidate = {
                 "id": p.get('user_id'),
                 "name": personal.get('name', 'Unknown'),
@@ -161,7 +178,8 @@ def load_candidates_from_supabase() -> List[Dict[str, Any]]:
                 "skills": skills,
                 "total_years": total_years,
                 "experience_level": experience_level,
-                "availability": "full-time", # Default
+                "availability": availability,
+                "work_preference": remote_pref,  # Keep original value too
                 "location": personal.get('location', ""),
                 "bio": personal.get('about', ""),
                 "profileImage": personal.get('image', ""),

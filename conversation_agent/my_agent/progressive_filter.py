@@ -17,6 +17,13 @@ try:
 except ImportError:
     SEMANTIC_AVAILABLE = False
 
+# Try to import Gemini for intelligent query understanding
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 
 class ProgressiveFilter:
     """
@@ -220,21 +227,62 @@ class ProgressiveFilter:
         # Direct matches
         direct_matches = [s for s in required_skills_lower if s in candidate_skills_lower]
         
-        # Transferable skills mapping
+        # Transferable skills mapping - maps a required skill to similar/related skills
         transferable_map = {
-            'react': ['vue.js', 'angular', 'next.js'],
-            'vue.js': ['react', 'angular'],
+            # Frontend frameworks
+            'react': ['vue.js', 'angular', 'next.js', 'svelte'],
+            'vue.js': ['react', 'angular', 'svelte'],
             'angular': ['react', 'vue.js'],
             'next.js': ['react'],
-            'node.js': ['express', 'nestjs', 'fastapi'],
-            'python': ['django', 'fastapi'],
+            # Backend
+            'node.js': ['express', 'nestjs', 'fastapi', 'express.js'],
+            'python': ['django', 'fastapi', 'flask'],
             'javascript': ['typescript'],
-            'typescript': ['javascript']
+            'typescript': ['javascript'],
+            # Cloud computing - searching for 'cloud' matches cloud providers
+            'cloud': ['aws', 'azure', 'google cloud', 'gcp', 'docker', 'kubernetes'],
+            'cloud computing': ['aws', 'azure', 'google cloud', 'gcp', 'docker', 'kubernetes', 'terraform'],
+            'aws': ['azure', 'google cloud', 'gcp', 'cloud'],
+            'azure': ['aws', 'google cloud', 'gcp', 'cloud'],
+            'google cloud': ['aws', 'azure', 'gcp', 'cloud'],
+            'gcp': ['aws', 'azure', 'google cloud', 'cloud'],
+            # DevOps
+            'devops': ['docker', 'kubernetes', 'ci/cd', 'jenkins', 'github actions', 'terraform', 'ansible'],
+            'docker': ['kubernetes', 'containerization'],
+            'kubernetes': ['docker', 'k8s'],
+            'k8s': ['kubernetes', 'docker'],
+            'ci/cd': ['jenkins', 'github actions', 'gitlab ci'],
+            # Databases
+            'sql': ['postgresql', 'mysql', 'sql server', 'sqlite'],
+            'nosql': ['mongodb', 'redis', 'dynamodb', 'cassandra'],
+            'postgresql': ['mysql', 'sql', 'sql server'],
+            'mongodb': ['nosql', 'redis', 'dynamodb'],
+            # Data/ML
+            'machine learning': ['tensorflow', 'pytorch', 'scikit-learn', 'ml', 'ai'],
+            'ml': ['machine learning', 'tensorflow', 'pytorch', 'scikit-learn'],
+            'ai': ['machine learning', 'ml', 'tensorflow', 'pytorch'],
+            'data science': ['python', 'pandas', 'numpy', 'jupyter', 'machine learning'],
+            # Mobile
+            'mobile': ['react native', 'flutter', 'swift', 'kotlin', 'ios', 'android'],
+            'ios': ['swift', 'mobile'],
+            'android': ['kotlin', 'java', 'mobile'],
+            # Role-based mappings (common search terms that should match skills)
+            'full stack': ['react', 'node.js', 'javascript', 'typescript', 'python', 'postgresql', 'mongodb', 'next.js', 'vue.js', 'django', 'express.js'],
+            'fullstack': ['react', 'node.js', 'javascript', 'typescript', 'python', 'postgresql', 'mongodb', 'next.js', 'vue.js', 'django', 'express.js'],
+            'full stack development': ['react', 'node.js', 'javascript', 'typescript', 'python', 'postgresql', 'mongodb', 'next.js', 'vue.js', 'django', 'express.js'],
+            'full-stack': ['react', 'node.js', 'javascript', 'typescript', 'python', 'postgresql', 'mongodb', 'next.js', 'vue.js', 'django', 'express.js'],
+            'frontend': ['react', 'vue.js', 'angular', 'javascript', 'typescript', 'html5', 'css3', 'next.js', 'tailwind css', 'sass'],
+            'frontend development': ['react', 'vue.js', 'angular', 'javascript', 'typescript', 'html5', 'css3', 'next.js', 'tailwind css'],
+            'front-end': ['react', 'vue.js', 'angular', 'javascript', 'typescript', 'html5', 'css3', 'next.js'],
+            'backend': ['node.js', 'python', 'java', 'go', 'django', 'fastapi', 'flask', 'express.js', 'spring boot', 'postgresql', 'mongodb'],
+            'backend development': ['node.js', 'python', 'java', 'go', 'django', 'fastapi', 'flask', 'express.js', 'spring boot'],
+            'back-end': ['node.js', 'python', 'java', 'go', 'django', 'fastapi', 'flask', 'express.js', 'spring boot'],
+            'web development': ['react', 'javascript', 'html5', 'css3', 'node.js', 'typescript'],
+            'web developer': ['react', 'javascript', 'html5', 'css3', 'node.js', 'typescript'],
         }
         
         # Find transferable skills
         transferable_matches = []
-        transferable_score = 0
         for required in required_skills_lower:
             if required not in direct_matches:
                 for candidate_skill in candidate_skills_lower:
@@ -243,13 +291,27 @@ class ProgressiveFilter:
                             'required': required,
                             'has': candidate_skill
                         })
-                        transferable_score += 15
                         break
         
-        # Calculate base score
+        # Calculate score
+        # New approach: Having ANY match is valuable, more matches = higher score
+        # Base score of 60 for having at least one match, bonus points for additional matches
         if required_skills_lower:
-            direct_score = (len(direct_matches) / len(required_skills_lower)) * 100
-            total_score = min(100, direct_score + transferable_score)
+            total_matches = len(direct_matches) + len(transferable_matches)
+            
+            if total_matches == 0:
+                # No matches at all
+                total_score = 0
+            elif total_matches == 1:
+                # At least one match - base score
+                total_score = 65 if direct_matches else 55  # Direct match worth more
+            else:
+                # Multiple matches - calculate based on coverage but with a good base
+                total_required = len(required_skills_lower)
+                # Start with 60, add up to 40 more based on match percentage
+                match_ratio = total_matches / total_required
+                direct_bonus = len(direct_matches) * 5  # Bonus for direct matches
+                total_score = min(100, 60 + (match_ratio * 30) + direct_bonus)
         else:
             total_score = 100
         
@@ -281,9 +343,72 @@ class ProgressiveFilter:
     
     def _extract_requirements_from_query(self, query: str) -> Dict[str, Any]:
         """
-        Extract requirements from natural language query
-        Uses simple keyword matching - in production would use Gemini
+        Extract requirements from natural language query using Gemini AI.
+        Falls back to keyword matching if Gemini is unavailable.
         """
+        # Try Gemini-powered extraction first
+        if GEMINI_AVAILABLE:
+            try:
+                return self._extract_with_gemini(query)
+            except Exception as e:
+                print(f"⚠️ Gemini extraction failed: {e}, using fallback")
+        
+        # Fallback to keyword-based extraction
+        return self._extract_with_keywords(query)
+    
+    def _extract_with_gemini(self, query: str) -> Dict[str, Any]:
+        """Use Gemini LLM to intelligently extract requirements from query."""
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("No API key found")
+        
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            temperature=0,
+            google_api_key=api_key
+        )
+        
+        prompt = (
+            "You are a technical recruiter assistant. Extract requirements from this query.\n\n"
+            f'Query: "{query}"\n\n'
+            "CRITICAL: Return ONLY specific technical skills that appear on developer resumes.\n"
+            "NEVER return role descriptions like 'full stack development' or 'cloud computing' as skills.\n"
+            "ALWAYS expand these into the ACTUAL technologies.\n\n"
+            "Examples of correct expansions:\n"
+            '- "full stack developer" -> ["react", "node.js", "javascript", "typescript", "python", "postgresql", "mongodb"]\n'
+            '- "cloud experience" -> ["aws", "azure", "google cloud", "docker", "kubernetes"]\n'
+            '- "frontend developer" -> ["react", "javascript", "typescript", "html", "css", "vue.js"]\n'
+            '- "backend engineer" -> ["python", "node.js", "java", "postgresql", "mongodb", "redis"]\n\n'
+            "Extract:\n"
+            "1. skills: List of CONCRETE technical skills (frameworks, languages, databases, tools)\n"
+            '2. experience_level: "junior", "mid", "senior", or "any"\n'
+            '3. work_preference: "remote", "hybrid", "on-site", or "any" (based on mentions of remote work, in-office, hybrid, etc.)\n'
+            '4. location: City/region mentioned, or "any" if not specified (e.g., "Austin", "New York", "Spain")\n\n'
+            "Return ONLY valid JSON, no markdown:\n"
+            '{"skills": [...], "experience_level": "...", "work_preference": "...", "location": "..."}'
+        )
+
+        response = llm.invoke(prompt)
+        content = response.content.strip()
+        
+        # Clean up response - remove markdown code blocks if present
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+        
+        result = json.loads(content)
+        result['raw_query'] = query
+        
+        # Ensure availability field exists (for backwards compatibility)
+        result['availability'] = result.get('work_preference', 'any')
+        
+        print(f"🧠 Gemini extracted: skills={result['skills']}, work_pref={result.get('work_preference')}, location={result.get('location')}")
+        return result
+    
+    def _extract_with_keywords(self, query: str) -> Dict[str, Any]:
+        """Fallback: Extract requirements using keyword matching."""
         query_lower = query.lower()
         
         # Extract experience level
@@ -295,42 +420,100 @@ class ProgressiveFilter:
         elif any(word in query_lower for word in ["mid", "mid-level", "intermediate"]):
             experience_level = "mid"
         
-        # Extract availability
-        availability = "any"
-        if any(word in query_lower for word in ["full-time", "full time", "fulltime"]):
-            availability = "full-time"
-        elif any(word in query_lower for word in ["freelance", "contractor"]):
-            availability = "freelance"
-        elif any(word in query_lower for word in ["part-time", "part time", "parttime"]):
-            availability = "part-time"
-        elif "contract" in query_lower:
-            availability = "contract"
+        # Extract work preference (remote/hybrid/on-site)
+        work_preference = "any"
+        if any(word in query_lower for word in ["remote", "work from home", "wfh"]):
+            work_preference = "remote"
+        elif any(word in query_lower for word in ["hybrid", "flex"]):
+            work_preference = "hybrid"
+        elif any(word in query_lower for word in ["on-site", "onsite", "in-office", "in office"]):
+            work_preference = "on-site"
+        
+        # Extract location (common cities/regions)
+        location = "any"
+        locations_to_check = [
+            "austin", "san francisco", "new york", "seattle", "miami", "chicago", 
+            "los angeles", "denver", "boston", "portland", "madrid", "barcelona",
+            "london", "berlin", "paris", "toronto", "vancouver", "sydney", "singapore", "tokyo",
+            "texas", "california", "spain", "uk", "germany", "canada", "australia"
+        ]
+        for loc in locations_to_check:
+            if loc in query_lower:
+                location = loc.title()
+                break
         
         # Extract skills (comprehensive list)
         skill_keywords = {
+            # Frontend
             'react': ['react', 'reactjs', 'react.js'],
             'next.js': ['next', 'nextjs', 'next.js'],
             'vue.js': ['vue', 'vuejs', 'vue.js'],
             'angular': ['angular'],
+            'svelte': ['svelte', 'sveltekit'],
             'typescript': ['typescript', 'ts'],
             'javascript': ['javascript', 'js'],
+            'html': ['html'],
+            'css': ['css', 'styling'],
+            'sass': ['sass', 'scss'],
+            'tailwind': ['tailwind', 'tailwindcss'],
+            'redux': ['redux'],
+            
+            # Backend
             'node.js': ['node', 'nodejs', 'node.js'],
             'python': ['python'],
             'django': ['django'],
             'fastapi': ['fastapi', 'fast api'],
+            'flask': ['flask'],
             'express': ['express', 'expressjs'],
-            'graphql': ['graphql', 'graph ql'],
-            'rest': ['rest', 'restful', 'rest api'],
+            'java': ['java'],
+            'spring': ['spring', 'springboot', 'spring boot'],
+            'go': ['golang', ' go '],
+            'rust': ['rust'],
+            'c++': ['c++', 'cpp'],
+            'c#': ['c#', 'csharp', 'dotnet', '.net'],
+            'ruby': ['ruby', 'rails', 'ruby on rails'],
+            'php': ['php', 'laravel'],
+            
+            # Databases
             'mongodb': ['mongodb', 'mongo'],
             'postgresql': ['postgresql', 'postgres', 'psql'],
+            'mysql': ['mysql'],
+            'redis': ['redis'],
+            'elasticsearch': ['elasticsearch', 'elastic'],
+            'sqlite': ['sqlite'],
+            
+            # APIs
+            'graphql': ['graphql', 'graph ql'],
+            'rest': ['rest', 'restful', 'rest api'],
+            
+            # Cloud & DevOps
             'aws': ['aws', 'amazon web services'],
+            'gcp': ['gcp', 'google cloud'],
+            'azure': ['azure'],
             'docker': ['docker', 'containers'],
-            'tailwind': ['tailwind', 'tailwindcss'],
-            'css': ['css', 'styling'],
-            'html': ['html'],
-            'redux': ['redux'],
+            'kubernetes': ['kubernetes', 'k8s'],
+            'terraform': ['terraform'],
+            'ci/cd': ['ci/cd', 'cicd', 'jenkins', 'github actions'],
+            
+            # Mobile
+            'react native': ['react native', 'react-native'],
+            'flutter': ['flutter', 'dart'],
+            'swift': ['swift', 'ios'],
+            'kotlin': ['kotlin', 'android'],
+            
+            # Data & ML
+            'pandas': ['pandas'],
+            'numpy': ['numpy'],
+            'tensorflow': ['tensorflow', 'tf'],
+            'pytorch': ['pytorch', 'torch'],
+            'machine learning': ['machine learning', 'ml', 'ai'],
+            
+            # Other
             'firebase': ['firebase'],
-            'testing': ['test', 'testing', 'jest', 'cypress', 'unit test']
+            'nginx': ['nginx'],
+            'linux': ['linux', 'unix'],
+            'git': ['git', 'github', 'gitlab'],
+            'testing': ['test', 'testing', 'jest', 'cypress', 'unit test', 'pytest']
         }
         
         detected_skills = []
@@ -352,7 +535,9 @@ class ProgressiveFilter:
         return {
             'skills': detected_skills,
             'experience_level': experience_level,
-            'availability': availability,
+            'work_preference': work_preference,
+            'location': location,
+            'availability': work_preference,  # Backwards compatibility
             'raw_query': query
         }
     
@@ -372,34 +557,56 @@ class ProgressiveFilter:
         # Combine all requirements from conversation history
         all_skills = []
         final_experience_level = "any"
-        final_availability = "any"
+        final_work_preference = "any"
+        final_location = "any"
         
         for turn in self.conversation_history:
             reqs = turn['requirements']
-            all_skills.extend(reqs['skills'])
+            all_skills.extend(reqs.get('skills', []))
             
             # More specific filters override general ones
-            if reqs['experience_level'] != "any":
+            if reqs.get('experience_level', 'any') != "any":
                 final_experience_level = reqs['experience_level']
-            if reqs['availability'] != "any":
-                final_availability = reqs['availability']
+            if reqs.get('work_preference', 'any') != "any":
+                final_work_preference = reqs['work_preference']
+            if reqs.get('availability', 'any') != "any":
+                final_work_preference = reqs['availability']  # Backwards compat
+            if reqs.get('location', 'any') != "any":
+                final_location = reqs['location']
         
         # Remove duplicates from skills
         all_skills = list(set(all_skills))
         
-        # Start with current candidates or all if first query
-        candidates_to_filter = self.current_candidates if self.current_candidates else self.all_candidates
+        # Start with all candidates for first query, or current for progressive refinement
+        # Only use current_candidates if we're in a multi-turn conversation (turn > 1)
+        if len(self.conversation_history) <= 1:
+            # First query in conversation - search all candidates
+            candidates_to_filter = self.all_candidates
+        else:
+            # Subsequent queries - refine from current pool
+            candidates_to_filter = self.current_candidates if self.current_candidates else self.all_candidates
         
         # Filter candidates
         matches = []
         for candidate in candidates_to_filter:
             # Check experience level
-            if final_experience_level != "any" and candidate["experience_level"] != final_experience_level:
+            if final_experience_level != "any" and candidate.get("experience_level") != final_experience_level:
                 continue
             
-            # Check availability
-            if final_availability != "any" and candidate["availability"] != final_availability:
-                continue
+            # Check work preference (remote/hybrid/on-site/flexible)
+            if final_work_preference != "any":
+                cand_pref = candidate.get("availability", "").lower()
+                cand_work_pref = candidate.get("work_preference", "").lower()
+                # Flexible candidates match any preference
+                if cand_pref != "flexible" and cand_work_pref != "flexible":
+                    if final_work_preference.lower() not in [cand_pref, cand_work_pref]:
+                        continue
+            
+            # Check location (partial match)
+            if final_location != "any":
+                cand_location = candidate.get("location", "").lower()
+                if final_location.lower() not in cand_location:
+                    continue
             
             # Calculate skill match
             if all_skills:
@@ -466,7 +673,8 @@ class ProgressiveFilter:
             "combined_filters": {
                 "skills": all_skills,
                 "experience_level": final_experience_level,
-                "availability": final_availability
+                "work_preference": final_work_preference,
+                "location": final_location
             },
             "total_candidates_searched": len(candidates_to_filter),
             "matches_found": len(matches),

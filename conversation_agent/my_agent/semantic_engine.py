@@ -23,7 +23,7 @@ class SemanticEngine:
     instead of heavy local models.
     """
     
-    def __init__(self, model_name: str = 'models/text-embedding-004'):
+    def __init__(self, model_name: str = 'models/gemini-embedding-001'):
         """
         Initialize the semantic engine with Google Cloud Embeddings.
         """
